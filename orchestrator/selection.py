@@ -304,10 +304,10 @@ class SelectionStrategy:
         if not parent:
             return None
         arm = parent.prompt_arm if parent.prompt_arm in prompt_bandit.templates else self.default_prompt_arm
-        backend = prompt_bandit.backend_for_arm(arm)
+        prompt = prompt_bandit.templates[arm].materialise()
         return generator.spawn_candidate(
             arm,
-            backend,
+            prompt,
             parents=(*parent.parents, parent.id),
             generation=parent.generation + 1,
         )
@@ -356,10 +356,13 @@ class SelectionStrategy:
                 return candidate
         return weighted[-1][1]
 
-    def bootstrap_population(self, generator: "ProgramGenerator") -> List[ProgramCandidate]:
+    def bootstrap_population(
+        self, generator: "ProgramGenerator", bandit: "PromptBandit"
+    ) -> List[ProgramCandidate]:
         seeds: List[ProgramCandidate] = []
         for _ in range(self.population_size):
-            seeds.append(generator.spawn_candidate(self.default_prompt_arm, backend="flash"))
+            arm_name, prompt = bandit.pick_prompt()
+            seeds.append(generator.spawn_candidate(arm_name, prompt))
         return seeds
 
     def snapshot(self) -> Dict[str, Any]:

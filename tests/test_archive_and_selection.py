@@ -12,7 +12,7 @@ from orchestrator.models import (
     Metrics,
     ProgramCandidate,
 )
-from orchestrator.prompt_policy import PromptBandit
+from orchestrator.prompt_policy import PromptBandit, PromptMaterialization
 from orchestrator.selection import ArchiveManager, SelectionStrategy
 
 
@@ -26,7 +26,14 @@ def _make_candidate(
     robustness: float,
     loc: int,
 ) -> ProgramCandidate:
-    candidate = generator.spawn_candidate(arm, backend)
+    prompt = PromptMaterialization(
+        name=arm,
+        backend=backend,
+        content="",
+        generation=0,
+        checklist=[],
+    )
+    candidate = generator.spawn_candidate(arm, prompt)
     candidate.metrics = Metrics(
         accuracy=accuracy,
         runtime_ms=runtime,
@@ -84,7 +91,14 @@ def test_cache_manager_uses_content_signature(tmp_path) -> None:
     generator = ProgramGenerator(baseline_path=baseline, output_root=tmp_path / "cache")
     cache = CacheManager()
 
-    candidate = generator.spawn_candidate("mutate.perf_first", "flash")
+    prompt = PromptMaterialization(
+        name="mutate.perf_first",
+        backend="flash",
+        content="",
+        generation=0,
+        checklist=[],
+    )
+    candidate = generator.spawn_candidate("mutate.perf_first", prompt)
     metrics = Metrics(accuracy=0.8, runtime_ms=15.0)
     result = EvaluationResult(candidate_id=candidate.id, tier="L0", passed=True, metrics=metrics)
     cache.record(candidate, result)
@@ -111,8 +125,22 @@ def test_program_generator_crossover(tmp_path) -> None:
     random.seed(123)
     baseline = Path("solutions/workdir/sample_solution.py")
     generator = ProgramGenerator(baseline_path=baseline, output_root=tmp_path / "crossover")
-    parent_a = generator.spawn_candidate("mutate.perf_first", "flash")
-    parent_b = generator.spawn_candidate("mutate.robust_first", "pro")
+    prompt_a = PromptMaterialization(
+        name="mutate.perf_first",
+        backend="flash",
+        content="",
+        generation=0,
+        checklist=[],
+    )
+    prompt_b = PromptMaterialization(
+        name="mutate.robust_first",
+        backend="pro",
+        content="",
+        generation=0,
+        checklist=[],
+    )
+    parent_a = generator.spawn_candidate("mutate.perf_first", prompt_a)
+    parent_b = generator.spawn_candidate("mutate.robust_first", prompt_b)
     child = generator.spawn_crossover_candidate(parent_a, parent_b)
 
     assert child.parents == (parent_a.id, parent_b.id)

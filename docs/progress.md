@@ -27,10 +27,10 @@
   3. 对接指标日志（OpenTelemetry/OpenMetrics），实现 `run_id` 级追踪。
 
 ### 3.2 候选生成与谱系
-- **现状**：`generation.py` 内的 `ProgramGenerator` 支持基于 EVOLVE-BLOCK 的多样随机生成，跟踪父代与提示臂。
-- **缺口**：缺乏对 Gemini CLI 或其它 LLM 代理的实际调用；交叉与修复策略尚未纳入；谱系信息未写回 Git。
+- **现状**：`generation.py` 内的 `ProgramGenerator` 支持基于 EVOLVE-BLOCK 的多样随机生成，跟踪父代与提示臂；新增 `GeminiAgentAdapter` 可直接调用已登录的 `gemini-cli` 并在失败时回退模板。
+- **缺口**：交叉与修复策略尚未纳入；谱系信息未写回 Git；CLI 仍需接入远程存储与错误分级重试。
 - **计划**：
-  1. 在 `generation.py` 新增 `GeminiAgentAdapter`，封装 `gemini-cli` CLI/API 调用，支持 JSON-only 输出与补丁结构校验。
+  1. 扩展 `GeminiAgentAdapter` 接入提示上下文的失败日志摘要，并支持多模型路由。
   2. 集成 `ast_crossover.py` 与 `repair` 流程，实现交叉或失败修复的候选注入。
   3. 与 `solutions/workdir/` 建立 Git 分支或工作树写入，记录 `patch.diff` 与谱系元数据。
 

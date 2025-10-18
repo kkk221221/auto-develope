@@ -24,7 +24,7 @@ python -m orchestrator.run_loop
 该命令执行 `EvolutionOrchestrator.demo_run()`：
 - 读取 `configs/tiers.yaml` 级联配置，依序运行 L0→L3；
 - 调用 `PromptBandit` 采样提示臂，包含元提示随机化与失败反馈；
-- 使用 `ProgramGenerator.spawn_candidate()` 或 `spawn_crossover_candidate()` 产生候选；
+- 使用 `ProgramGenerator.spawn_candidate(arm_name, PromptMaterialization)` 或 `spawn_crossover_candidate()` 产生候选；
 - 通过 `TierExecutor` 调用 `ProblemEvaluator`，获取指标与 `BehaviorFeatures`；
 - 将结果写入 `ArchiveManager`、`SelectionStrategy` 与缓存。
 
@@ -82,4 +82,6 @@ python problems/sample_problem/bench.py
 - 《docs/self-evolving-system.md》：总体架构与设计原则。
 - 《docs/governance.md》：安全、合规、审计要求。
 - 《docs/observability.md》：指标、日志与可视化方案。
+
+> 💡 若已安装并登录 `gemini-cli`，可通过环境变量 `GEMINI_CLI_COMMAND="gemini prompt --output json"` 启用真实 LLM 生成。Orchestrator 会自动实例化 `GeminiAgentAdapter`，将 `PromptBandit` 渲染的提示文本发送给 CLI，并在解析失败时回退到内置模板变异。
 

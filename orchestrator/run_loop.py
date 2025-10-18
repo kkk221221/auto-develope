@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import random
 from collections import deque
 from dataclasses import asdict, replace
+from pathlib import Path
 from typing import Deque, Iterable, List, Optional
 
-from pathlib import Path
-
+from .agents import GeminiAgentAdapter
 from .behaviors import extract_behavior_features
 from .caching import CacheManager
 from .evaluation import ProblemEvaluator, TierExecutor, load_tier_specs
@@ -124,7 +125,7 @@ class EvolutionOrchestrator:
 
     def _sample_and_generate(self) -> ProgramCandidate:
         arm_name, prompt = self.prompt_bandit.pick_prompt()
-        candidate = self.program_generator.spawn_candidate(arm_name, prompt.backend)
+        candidate = self.program_generator.spawn_candidate(arm_name, prompt)
         LOGGER.debug("Generating new candidate %s with arm %s", candidate.id, arm_name)
         return candidate
 
@@ -210,7 +211,15 @@ async def demo_run() -> None:
     )
     cache_manager = CacheManager()
     baseline_path = Path("solutions/workdir/sample_solution.py")
-    generator = ProgramGenerator(baseline_path=baseline_path, output_root=Path(".artifacts/candidates"))
+    agent: GeminiAgentAdapter | None = None
+    cli_command = os.getenv("GEMINI_CLI_COMMAND")
+    if cli_command:
+        agent = GeminiAgentAdapter(cli_command=cli_command.split())
+    generator = ProgramGenerator(
+        baseline_path=baseline_path,
+        output_root=Path(".artifacts/candidates"),
+        agent=agent,
+    )
     persistence = FilesystemPersistence(Path(".artifacts/run_state.json"))
 
     orchestrator = EvolutionOrchestrator(
@@ -223,7 +232,9 @@ async def demo_run() -> None:
         persistence=persistence,
     )
 
-    orchestrator.queue_initial_population(selection.bootstrap_population(generator))
+    orchestrator.queue_initial_population(
+        selection.bootstrap_population(generator, prompt_bandit)
+    )
     await orchestrator.run(max_steps=5)
 
 
