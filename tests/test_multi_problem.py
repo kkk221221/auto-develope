@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from pathlib import Path
 
+from orchestrator.agents import LLMApiAgentError
 from orchestrator.generation import ProgramGenerator
 from orchestrator.problem_specs import load_problem_specs
 from orchestrator.prompt_policy import PromptBandit, PromptMaterialization
@@ -93,3 +94,47 @@ def test_repair_snippet_is_generated(tmp_path) -> None:
     source = Path(candidate.source_path).read_text(encoding="utf-8")
     assert "def solve" in source
     assert candidate.patch_payload["intent"] == "repair"
+
+
+def test_program_generator_agent_cooldown(monkeypatch, tmp_path) -> None:
+    class _FailingAdapter:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, _: PromptMaterialization):
+            self.calls += 1
+            raise LLMApiAgentError("boom")
+
+    stub = _FailingAdapter()
+    fake_time = {"value": 100.0}
+
+    def _fake_monotonic() -> float:
+        return fake_time["value"]
+
+    monkeypatch.setattr("orchestrator.generation.time.monotonic", _fake_monotonic)
+
+    generator = ProgramGenerator(
+        problem_specs=PROBLEM_SPECS,
+        output_root=tmp_path / "cooldown",
+        agent=stub,
+        agent_cooldown_base_s=10.0,
+        agent_cooldown_max_s=10.0,
+    )
+
+    prompt = PromptMaterialization(
+        name="mutate.perf_first",
+        backend="flash",
+        content="",
+        generation=0,
+        checklist=[],
+    )
+
+    generator.spawn_candidate("mutate.perf_first", prompt, problem_id="sample_problem")
+    assert stub.calls == 1
+
+    generator.spawn_candidate("mutate.perf_first", prompt, problem_id="sample_problem")
+    assert stub.calls == 1  # cooldown prevents second call
+
+    fake_time["value"] += 20.0
+    generator.spawn_candidate("mutate.perf_first", prompt, problem_id="sample_problem")
+    assert stub.calls == 2

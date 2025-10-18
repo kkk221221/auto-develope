@@ -4,6 +4,8 @@ from __future__ import annotations
 import ast
 import importlib
 import importlib.util
+import multiprocessing
+from multiprocessing.connection import Connection
 import statistics
 import sys
 from dataclasses import dataclass
@@ -12,7 +14,41 @@ from time import perf_counter
 from types import ModuleType
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
+try:  # pragma: no cover - resource may be unavailable on some platforms
+    import resource
+except ImportError:  # pragma: no cover - fallback for non-POSIX platforms
+    resource = None  # type: ignore[assignment]
+
 from .models import BehaviorFeatures, EvaluationResult, Metrics, ProgramCandidate
+
+
+_BANNED_MODULES = {"os", "subprocess", "pathlib", "inspect"}
+_BANNED_CALLS = {
+    "eval",
+    "exec",
+    "__import__",
+    "open",
+    "compile",
+    "input",
+    "globals",
+    "locals",
+    "vars",
+    "getattr",
+    "setattr",
+    "delattr",
+}
+_BANNED_ATTRIBUTES = {
+    "__dict__",
+    "__class__",
+    "__globals__",
+    "__getattribute__",
+    "__subclasses__",
+    "__code__",
+    "__closure__",
+}
+_BANNED_NAMES = {"__builtins__", "__loader__", "__spec__"}
+_MAX_AST_NODES = 600
+_MAX_AST_DEPTH = 32
 
 
 @dataclass
@@ -28,15 +64,57 @@ class TierSpec:
     max_runtime_ms: Optional[float] = None
 
 
+def _sandbox_worker(
+    source_path: str,
+    samples: Sequence,
+    memory_limit_bytes: int,
+    conn: Connection,
+) -> None:
+    try:
+        if memory_limit_bytes > 0 and resource is not None:
+            try:
+                resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
+                resource.setrlimit(resource.RLIMIT_DATA, (memory_limit_bytes, memory_limit_bytes))
+            except (ValueError, OSError):  # pragma: no cover - defensive
+                pass
+        module_name = f"candidate_{Path(source_path).stem}_{hash(source_path) & 0xFFFF:x}"
+        spec = importlib.util.spec_from_file_location(module_name, source_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Unable to load candidate module from {source_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        if not hasattr(module, "solve"):
+            raise AttributeError("Candidate module must define solve()")
+        solve = getattr(module, "solve")
+        result = float(solve(samples))
+        conn.send(("ok", result))
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        try:
+            conn.send(("error", f"{type(exc).__name__}: {exc}"))
+        except Exception:  # pragma: no cover - defensive fallback
+            pass
+    finally:
+        conn.close()
+
+
 class ProblemEvaluator:
     """Executes problem-specific evaluations for a candidate program."""
 
-    def __init__(self, problem_packages: Mapping[str, str]) -> None:
+    def __init__(
+        self,
+        problem_packages: Mapping[str, str],
+        *,
+        execution_timeout_s: float = 5.0,
+        memory_limit_mb: int = 256,
+    ) -> None:
         if not problem_packages:
             raise ValueError("ProblemEvaluator requires at least one problem package")
         self.problem_packages = dict(problem_packages)
         self._data_generators: Dict[str, ModuleType] = {}
         self._oracles: Dict[str, ModuleType] = {}
+        self.execution_timeout_s = max(0.5, float(execution_timeout_s))
+        self.memory_limit_mb = max(64, int(memory_limit_mb))
 
     def evaluate(
         self,
@@ -117,21 +195,37 @@ class ProblemEvaluator:
         return module
 
     def _execute_solver(self, source_path: str, samples: Iterable) -> float:
-        module = self._load_module(source_path)
-        if not hasattr(module, "solve"):
-            raise AttributeError("Candidate module must define solve()")
-        solve = getattr(module, "solve")
-        return float(solve(samples))
-
-    def _load_module(self, source_path: str) -> ModuleType:
-        module_name = f"candidate_{Path(source_path).stem}_{hash(source_path) & 0xFFFF:x}"
-        spec = importlib.util.spec_from_file_location(module_name, source_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Unable to load candidate module from {source_path}")
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        return module
+        dataset = list(samples)
+        memory_bytes = int(self.memory_limit_mb * 1024 * 1024)
+        ctx = multiprocessing.get_context("spawn")
+        parent_conn, child_conn = ctx.Pipe(duplex=False)
+        process = ctx.Process(
+            target=_sandbox_worker,
+            args=(source_path, dataset, memory_bytes, child_conn),
+            daemon=True,
+        )
+        process.start()
+        if parent_conn.poll(self.execution_timeout_s):
+            try:
+                status, payload = parent_conn.recv()
+            finally:
+                parent_conn.close()
+            process.join()
+            if status == "ok":
+                return float(payload)
+            raise RuntimeError(f"Candidate execution failed: {payload}")
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            parent_conn.close()
+            raise TimeoutError(
+                f"Candidate execution exceeded {self.execution_timeout_s:.2f}s sandbox limit"
+            )
+        exit_code = process.exitcode
+        parent_conn.close()
+        raise RuntimeError(
+            f"Candidate execution terminated unexpectedly with exit code {exit_code}"
+        )
 
     def _score_accuracy(self, candidate_score: float, reference_score: float) -> float:
         denom = max(abs(reference_score), 1.0)
@@ -292,15 +386,54 @@ class TierExecutor:
         return True
 
     async def _ast_rules(self, candidate: ProgramCandidate) -> bool:
-        banned = {"os", "subprocess"}
-        tree = ast.parse(Path(candidate.source_path).read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
+        source = Path(candidate.source_path).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        node_count = 0
+        max_depth = 0
+        stack: List[tuple[ast.AST, int]] = [(tree, 0)]
+        suspicious_strings = 0
+
+        while stack:
+            node, depth = stack.pop()
+            node_count += 1
+            max_depth = max(max_depth, depth)
+            if node_count > _MAX_AST_NODES or max_depth > _MAX_AST_DEPTH:
+                return False
+
+            if isinstance(node, (ast.Global, ast.Nonlocal)):
+                return False
+
             if isinstance(node, ast.Import):
-                if any(alias.name.split(".")[0] in banned for alias in node.names):
+                for alias in node.names:
+                    if alias.name.split(".")[0] in _BANNED_MODULES:
+                        return False
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and node.module.split(".")[0] in _BANNED_MODULES:
                     return False
-            if isinstance(node, ast.ImportFrom):
-                if node.module and node.module.split(".")[0] in banned:
+            elif isinstance(node, ast.Call):
+                func = node.func
+                call_name = None
+                if isinstance(func, ast.Name):
+                    call_name = func.id
+                elif isinstance(func, ast.Attribute):
+                    call_name = func.attr
+                if call_name and call_name in _BANNED_CALLS:
                     return False
+            elif isinstance(node, ast.Attribute):
+                if node.attr in _BANNED_ATTRIBUTES:
+                    return False
+            elif isinstance(node, ast.Name):
+                if node.id in _BANNED_NAMES:
+                    return False
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if any(marker in node.value for marker in _BANNED_CALLS | _BANNED_ATTRIBUTES | _BANNED_NAMES):
+                    suspicious_strings += 1
+                    if suspicious_strings > 2:
+                        return False
+
+            stack.extend((child, depth + 1) for child in ast.iter_child_nodes(node))
+
         return True
 
 

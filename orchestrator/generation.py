@@ -4,17 +4,21 @@ from __future__ import annotations
 import logging
 import re
 import textwrap
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Callable, Dict, Mapping, Optional, Tuple, cast
 
-from .agents import AgentGeneration, GeminiAgentAdapter, GeminiAgentError
+from .agents import AgentGeneration, LLMApiAgentAdapter, LLMApiAgentError
 from .ast_crossover import perform_ast_crossover
 from .git_lineage import GitLineageError, GitLineageTracker
 from .models import BehaviorFeatures, ProgramCandidate
 from .prompt_policy import PromptMaterialization
 from .problem_specs import ProblemSpec
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    from .prompt_policy import PromptBandit
 
 LOGGER = logging.getLogger(__name__)
 
@@ -739,14 +743,27 @@ def solve(pairs: Iterable[Tuple[int, int]]) -> float:
 
 
 @dataclass
+class _AgentCooldown:
+    failures: int = 0
+    cooldown_until: float = 0.0
+
+
+class PromptValidationError(LLMApiAgentError):
+    """Raised when an LLM-generated snippet violates mandatory constraints."""
+
+
+@dataclass
 class ProgramGenerator:
     """Applies mutations or agent-supplied patches to seed candidates."""
 
     problem_specs: Mapping[str, ProblemSpec]
     output_root: Path
-    agent: Optional[GeminiAgentAdapter] = None
+    agent: Optional[LLMApiAgentAdapter] = None
     lineage_tracker: Optional[GitLineageTracker] = None
+    prompt_bandit: Optional["PromptBandit"] = None
     _agent_enabled: bool = field(init=False, default=True)
+    agent_cooldown_base_s: float = 15.0
+    agent_cooldown_max_s: float = 180.0
 
     def __post_init__(self) -> None:
         if not self.problem_specs:
@@ -760,6 +777,7 @@ class ProgramGenerator:
         self.default_problem = next(iter(self.problem_specs))
         self.output_root.mkdir(parents=True, exist_ok=True)
         self._agent_enabled = self.agent is not None
+        self._agent_failures: Dict[str, _AgentCooldown] = {}
 
     def spawn_candidate(
         self,
@@ -775,10 +793,9 @@ class ProgramGenerator:
         target_problem = problem_id or self.default_problem
         if target_problem not in self.problem_specs:
             raise KeyError(f"Unknown problem id: {target_problem}")
-        arm_key = arm.rsplit(".", 1)[-1]
         snippet, metadata = self._materialise_snippet(
             target_problem,
-            arm_key,
+            arm,
             prompt,
             intent=intent,
             failure_context=failure_context,
@@ -862,16 +879,32 @@ class ProgramGenerator:
     def _materialise_snippet(
         self,
         problem_id: str,
-        arm_key: str,
+        arm_name: str,
         prompt: PromptMaterialization,
         *,
         intent: str,
         failure_context: Optional[str],
     ) -> Tuple[str, Dict[str, object]]:
         prompt_to_use = prompt
+        context_lines: list[str] = []
         if failure_context:
-            prompt_to_use = prompt.with_context(failure_context)
-        if self.agent and self._agent_enabled:
+            context_lines.extend(str(item) for item in failure_context.split("\n"))
+        baseline_block = self.baseline_blocks[problem_id]
+        target_file = self.problem_specs[problem_id].baseline_path
+        required_tokens = self._required_tokens_for_block(baseline_block)
+        context_lines.extend(
+            [
+                f"problem_id: {problem_id}",
+                f"target_file: {target_file}",
+                "current_evolve_block:",
+                baseline_block,
+            ]
+        )
+        if context_lines:
+            prompt_to_use = prompt.with_context(context_lines)
+        arm_key = arm_name.rsplit(".", 1)[-1]
+        cooldown_key = f"{problem_id}:{arm_key}"
+        if self.agent and self._agent_enabled and not self._agent_in_cooldown(cooldown_key):
             try:
                 agent_result: AgentGeneration = self.agent.generate(prompt_to_use)
                 snippet = agent_result.snippet
@@ -879,19 +912,28 @@ class ProgramGenerator:
                     Dict[str, object],
                     {
                         "arm": arm_key,
-                        "strategy": "gemini_cli",
+                        "strategy": "llm_api",
                         "telemetry": list(agent_result.telemetry_tags),
                         **dict(agent_result.metadata),
                         "problem_id": problem_id,
                         "intent": intent,
                     },
                 )
+                self._ensure_required_tokens(snippet, required_tokens)
+                self._agent_failures.pop(cooldown_key, None)
                 return snippet, metadata
-            except GeminiAgentError as error:
-                LOGGER.warning("Gemini CLI fallback for %s: %s", problem_id, error)
-                self._agent_enabled = False
+            except LLMApiAgentError as error:
+                LOGGER.warning(
+                    "LLM API fallback for problem=%s arm=%s: %s",
+                    problem_id,
+                arm_key,
+                    error,
+                )
+                self._record_invalid_prompt_output(arm_name, type(error).__name__)
+                self._register_agent_failure(cooldown_key)
         if intent == "repair":
             snippet = _repair_snippet(problem_id, failure_context)
+            self._ensure_required_tokens(snippet, required_tokens)
             metadata = cast(
                 Dict[str, object],
                 {
@@ -911,6 +953,7 @@ class ProgramGenerator:
 
             snippet_factory = baseline_factory
         snippet = snippet_factory()
+        self._ensure_required_tokens(snippet, required_tokens)
         metadata = cast(
             Dict[str, object],
             {
@@ -922,6 +965,28 @@ class ProgramGenerator:
             },
         )
         return snippet, metadata
+
+    def _agent_in_cooldown(self, key: str) -> bool:
+        state = self._agent_failures.get(key)
+        if not state:
+            return False
+        now = time.monotonic()
+        if now >= state.cooldown_until:
+            self._agent_failures.pop(key, None)
+            return False
+        return True
+
+    def _register_agent_failure(self, key: str) -> None:
+        if key not in self._agent_failures:
+            self._agent_failures[key] = _AgentCooldown()
+        state = self._agent_failures[key]
+        state.failures += 1
+        base = max(1.0, float(self.agent_cooldown_base_s))
+        cooldown = min(
+            max(base, base * (2 ** (state.failures - 1))),
+            max(base, float(self.agent_cooldown_max_s)),
+        )
+        state.cooldown_until = time.monotonic() + cooldown
 
     def _record_lineage(self, candidate: ProgramCandidate) -> None:
         if not self.lineage_tracker:
@@ -937,3 +1002,23 @@ class ProgramGenerator:
             metadata_obj = {}
             candidate.patch_payload["metadata"] = metadata_obj
         metadata_obj["git_commit"] = commit
+
+    def _record_invalid_prompt_output(self, arm_name: str, reason: str) -> None:
+        if not self.prompt_bandit:
+            return
+        if not reason:
+            reason = "Unknown"
+        self.prompt_bandit.register_invalid_response(arm_name, reason)
+
+    @staticmethod
+    def _required_tokens_for_block(baseline_block: str) -> List[str]:
+        tokens: List[str] = []
+        if "def solve" in baseline_block:
+            tokens.append("def solve")
+        return tokens
+
+    @staticmethod
+    def _ensure_required_tokens(snippet: str, required_tokens: Sequence[str]) -> None:
+        for token in required_tokens:
+            if token not in snippet:
+                raise PromptValidationError(f"Missing required token: {token}")

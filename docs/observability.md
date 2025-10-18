@@ -12,20 +12,24 @@
 | `robustness` | ProblemEvaluator | 结合常规样本与 `stress_suites` 评分，反映对抗稳定性 |
 | `cache_hit_rate` | CacheManager | `report()` 返回的 `hit_rate`，衡量缓存复用效果 |
 | `novelty_score` | ArchiveManager | 每个候选的行为距离，可绘制代际趋势 |
+| `prompt_reward` / `arm_temperature` | PromptBandit | 由 `.artifacts/prompt_telemetry.json` 提供，衡量提示臂探索/收敛情况 |
+| `invalid_responses` | PromptBandit | 记录每个提示臂被 JSON 校验拒绝的次数，可用于发现结构性问题 |
 
 ## 2. 日志与追踪
 
 - **Orchestrator**：`logging` 默认 INFO 级别，记录候选入队、缓存命中、级联失败等事件。建议在生产环境将日志重定向至集中式平台（如 Cloud Logging、ELK）。
-- **Prompt 反馈**：`PromptBandit.ingest_feedback` 会把失败标签写入 checklist，可序列化成 JSON 供可视化使用。
+- **Prompt 反馈**：`PromptBandit.ingest_feedback` 会把失败标签写入 checklist，可序列化成 JSON 供可视化使用；`DEFAULT_SYSTEM_PROMPT` 与上下文中包含的 EVOLVE-BLOCK 基准文本，可在日志中定位 LLM 输出偏差；`register_invalid_response` 会在提示遥测中累积 `invalid_responses` 计数与原因。
 - **评测记录**：`EvaluationResult.completed_at` 提供时区安全的时间戳，可用于构建甘特图或瀑布图。
+- **运行快照**：`FilesystemPersistence` 在每次 step 结束写入 `.artifacts/run_state.json`，包含候选队列、Bandit 权重、缓存统计，可作为离线调试的事实来源。
 
 ## 3. 数据导出
 
 1. **档案热力图**：遍历 `ArchiveManager.state.map_elites_cells`，统计 `(complexity_bin, robustness_bin)` 占用情况，可生成矩阵图像；系统默认同时渲染 `.artifacts/dashboard.html` 提供静态可视化。
-2. **MAP-Elites 快照**：`EvolutionOrchestrator` 会将 `ArchiveManager.snapshot()` 写入 `.artifacts/map_elites.json`，可直接供面板或离线分析使用。
-3. **Pareto 前沿**：`ArchiveManager.state.pareto_front` 提供候选 ID，结合 `ProgramCandidate.metrics` 绘制多目标散点。
-4. **缓存统计**：`CacheManager.report()` 返回 `lookups/hits/hit_rate/entries`，可按时间序列写入 Prometheus Gauge。
-5. **提示臂表现**：`PromptBandit.export_telemetry` 会生成 `.artifacts/prompt_telemetry.json`，其中包含成功率、温度与 checklist，适合作为 A/B 报表输入。
+2. **MAP-Elites 快照**：`EvolutionOrchestrator` 会将 `ArchiveManager.snapshot()` 写入 `.artifacts/map_elites.json`，可直接供面板或离线分析使用；同目录下的 `.artifacts/dashboard.html` 已渲染热力图，可作为静态预览。
+3. **Pareto 前沿**：`ArchiveManager.state.pareto_front` 提供候选 ID，结合 `ProgramCandidate.metrics` 绘制多目标散点；与 `.artifacts/git_lineage/` 配合可追溯候选谱系。
+4. **缓存统计**：`CacheManager.report()` 返回 `lookups/hits/hit_rate/entries`，可按时间序列写入 Prometheus Gauge；若命中率异常，可与 `run_state.json` 中的缓存快照比对。
+5. **提示臂表现**：`PromptBandit.export_telemetry` 会生成 `.artifacts/prompt_telemetry.json`，其中包含成功率、温度与 checklist，适合作为 A/B 报表输入；同一文件还记录最近一次 LLM 奖励（0~1），可用于告警。
+6. **运行状态**：`.artifacts/run_state.json` 序列化 `pending_candidates`，便于构建 “候选待评估长度” 指标或定位卡队列问题。
 
 ## 4. 可视化建议
 

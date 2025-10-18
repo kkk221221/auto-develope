@@ -1,10 +1,10 @@
-# 基于 Gemini CLI 的自进化算法系统设计
+# 基于 LLM API 的自进化算法系统设计
 
-> 面向在 `google-gemini/gemini-cli` 基础上搭建一个与 AlphaEvolve 思路一致的自进化算法系统。本设计围绕体系结构、数据与接口、演化算法细节、提示工程与 LLM 编排、评测级联与调度、变异/交叉实现路线、观测与治理、安全与合规、成本与伸缩、可复现性、落地里程碑与验收标准等核心主题展开，并对关键外部事实提供出处。
+> 面向直接调用企业自建或第三方托管的 LLM 推理 API，构建与 AlphaEvolve 思路一致的自进化算法系统。本设计围绕体系结构、数据与接口、演化算法细节、提示工程与 LLM 编排、评测级联与调度、变异/交叉实现路线、观测与治理、安全与合规、成本与伸缩、可复现性、落地里程碑与验收标准等核心主题展开，并对关键外部事实提供出处。
 
 ‼️ 关键参考：
-- **Gemini CLI**：官方 README 明确其是开源 AI 代理，终端优先、支持文件操作、Shell、Web 抓取、Google Search grounding、MCP 扩展，提供 GitHub Action 集成，并在“登录 Google 账户”形态下提供 1M tokens 上下文与 60 RPM / 1000 RPD 的免费配额（以官方文档为准）。([GitHub](https://github.com/google-gemini/gemini-cli "GitHub - google-gemini/gemini-cli: An open-source AI agent that brings the power of Gemini directly into your terminal."))
-- **AlphaEvolve**：DeepMind 公布的进化式代码代理：用户定义“做什么（What）”，系统自动完成“怎么做（How）”；核心组件包括程序数据库、提示采样器、LLM 组、评测池、分布式控制器循环；支持多目标优化，对代码库进行 diff/patch 级别演化；被演化区域通过 `# EVOLVE-BLOCK-START/END` 标注；还采用 “SEARCH/REPLACE” 差异格式产生可定位的修改。([Google DeepMind](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/ "AlphaEvolve: A Gemini-powered coding agent for designing advanced algorithms - Google DeepMind"))
+- **LLM 推理 API**：主流厂商均提供 REST/gRPC 推理接口与多模型管理能力，可配置密钥、速率、上下文长度与安全策略；通过 HTTP 直接请求更易于集成审计、限流与可观测性。([Google AI Studio](https://ai.google.dev/ "Google AI Studio"), [OpenAI Platform](https://platform.openai.com/ "OpenAI Platform"))
+- **AlphaEvolve**：DeepMind 公布的进化式代码代理：用户定义“做什么（What）”，系统自动完成“怎么做（How）”；核心组件包括程序数据库、提示采样器、LLM 组、评测池、分布式控制器循环；支持多目标优化，对代码库进行 diff/patch 级别演化；被演化区域通过 `# EVOLVE-BLOCK-START/END` 标注；还采用 “SEARCH/REPLACE” 差异格式产生可定位的修改。([Google DeepMind](https://deepmind.google/discover/blog/alphaevolve-a-gemini-powered-coding-agent-for-designing-advanced-algorithms/ "AlphaEvolve: A LLM-powered coding agent for designing advanced algorithms - Google DeepMind"))
 - **MAP‑Elites**：品质多样性（QD）族算法，维护维度化网格以同时保留多样且高质量的精英方案。([arXiv](https://arxiv.org/abs/1504.04909?utm_source=chatgpt.com "Illuminating search spaces by mapping elites"))
 
 ---
@@ -41,11 +41,11 @@
 
 **落地基座**：
 
-- **执行代理**：Gemini CLI（文件编辑、Shell、Web 抓取、MCP 扩展、GitHub Action 集成）。([GitHub](https://github.com/google-gemini/gemini-cli "GitHub - google-gemini/gemini-cli: An open-source AI agent that brings the power of Gemini directly into your terminal."))
+- **执行代理**：HTTP LLM 推理 API（多模型管理、密钥权限、可观测性、速率限制、审计日志）。
 - **分布式控制器**：Python `asyncio` 服务（支持多实例选主）。
 - **存储**：PostgreSQL（元数据）、对象存储（工件/补丁）、向量库（特征/提示语义）、Git（谱系）。
 - **队列**：Redis/Cloud PubSub（任务/回执/心跳）。
-- **评测节点**：K8s Jobs 或 GitHub Actions 并发矩阵（与 gemini‑cli action 结合）。([GitHub](https://github.com/google-gemini/gemini-cli "GitHub - google-gemini/gemini-cli: An open-source AI agent that brings the power of Gemini directly into your terminal."))
+- **评测节点**：K8s Jobs 或 GitHub Actions 并发矩阵，可通过自定义 Action 或工作流脚本调用 LLM 推理 API。
 
 ### 1.2 用户定义（What）
 
@@ -64,7 +64,7 @@
 ### 1.4 当前实现映射（2024Q4 仓库快照）
 
 - **编排循环与持久化**：`EvolutionOrchestrator` 负责装载多问题配置、调度 `EvaluationScheduler`、处理缓存命中并将档案/种群/提示臂快照写入 `RunState`；若存在历史快照会在启动时自动恢复待评估队列与缓存统计，同时按环境变量可重排问题岛序。【F:orchestrator/run_loop.py†L35-L236】【F:orchestrator/persistence.py†L13-L108】
-- **候选生成与 Gemini 集成**：`ProgramGenerator` 读取 `configs/problems.json`，按 `problem_id` 渲染 EVOLVE 区块并在修复路径中注入失败上下文；若配置 `GeminiAgentAdapter` 则优先消费 CLI 的 SEARCH/REPLACE 片段，失败时退回内置多问题模板，另提供 AST 引导的同域交叉并输出冲突列表。【F:orchestrator/generation.py†L106-L356】【F:orchestrator/agents.py†L28-L124】
+- **候选生成与 LLM API 集成**：`ProgramGenerator` 读取 `configs/problems.json`，按 `problem_id` 渲染 EVOLVE 区块并在修复路径中注入失败上下文；若配置 `LLMApiAgentAdapter` 则通过 OpenAI SDK 拉取流式 JSON patch，失败时退回内置多问题模板，另提供 AST 引导的同域交叉并输出冲突列表。【F:orchestrator/generation.py†L106-L356】【F:orchestrator/agents.py†L134-L336】
 - **谱系存档**：`GitLineageTracker` 在 `.artifacts/git_lineage/` 初始化 Git 仓库，记录候选源码与补丁元数据并写入 `ProgramCandidate.lineage_commit`，支持后续审计与回放。【F:orchestrator/git_lineage.py†L1-L123】
 - **提示老虎机与元提示**：`PromptBandit` 从模板目录解析臂配置、意图与所属岛屿，使用 Thompson Sampling 采样，并在奖励/失败反馈到来时更新温度、指令顺序与 checklist，现已支持 `repair` 臂、问题定向抽样，并导出 `.artifacts/prompt_telemetry.json`。【F:orchestrator/prompt_policy.py†L13-L303】
 - **评测级联与行为特征**：`ProblemEvaluator` 在 `TierExecutor` 驱动下针对 `problem_id` 选择对应数据生成与 oracle，执行 L0→L3 检查并输出稳健统计、对抗套件评分、行为特征；配置由 `configs/tiers.yaml` 加载。【F:orchestrator/evaluation.py†L18-L255】
@@ -149,15 +149,16 @@ archive:
   - `unified diff`（大改动/跨文件）。
   - **SEARCH/REPLACE**（对齐 AlphaEvolve 的局部替换语法，定位精确、可幂等）。
 - 大仓改动必须先输出迁移计划（多步小补丁），再按步执行。
+- 默认系统提示 `DEFAULT_SYSTEM_PROMPT` 强制 LLM 输出 `{"version":1,"patches":[{"diff_type":"sr",...}]}`，若模型偏离该 schema 将被 `LLMApiAgentAdapter` 拒绝并触发模板回退。
 
 ### 3.2 Prompt Sampler（信息来源与组装）
 
-- **来源**：Program DB 的精英/失败多样本、行为远点（novel）、用户背景 PDF/公式、评测摘要。
-- **组装**：Few-shot 引入 2–3 个高分方案及“失败→修复”的因果链；随机格式化增强多样性；目标权重随代数退火。
+- **来源**：Program DB 的精英/失败多样本、行为远点（novel）、用户背景 PDF/公式、评测摘要、`.artifacts/prompt_telemetry.json` 中的奖励趋势。
+- **组装**：Few-shot 引入 2–3 个高分方案及“失败→修复”的因果链；随机格式化增强多样性；目标权重随代数退火；请求载荷中附带 `problem_id`、目标文件路径及当前 EVOLVE-BLOCK 源码，为 `payload.search` 提供精确锚点。
 
 ### 3.3 生成级联与模型分工
 
-- **阶段 A（探索）**：Gemini Flash 多产候选（较低温度 + 语义多样性约束）。
+- **阶段 A（探索）**：高吞吐模型（如 Flash 类别）多产候选（较低温度 + 语义多样性约束）。
 - **阶段 B（打磨）**：对 A 的 Top‑K 由 Pro 复查与二次变异/融合（更严格 checklist）。
 - **失败快速修复**：独立的 `repair.md` 模板读取编译/测试日志，生成微补丁。
 
@@ -166,6 +167,7 @@ archive:
 - 臂 = 模板变体（性能优先/鲁棒优先/简洁优先/探索优先）。
 - 奖励 = `0.6*Δacc + 0.3*Δruntime_gain + 0.1*Δrobust`（3 代滚动）。
 - 算法：**Thompson Sampling**；冷启均匀探索，热启承继历史。
+- 遥测：每个 step 后导出 `.artifacts/prompt_telemetry.json`，记录成功率、温度、checklist、最新奖励与 `invalid_responses` 计数，供治理与告警使用。
 
 ### 3.5 元提示进化（Meta‑Prompt Evolution）
 
@@ -325,8 +327,8 @@ archive:
 
 - **LLM 成本**：Flash 承担高吞吐探索，Pro 只在 Top‑K 上“深思考”；阈值与 K 动态调参（队列长度/错误率/收益）。
 - **评测成本**：Successive Halving + 缓存 + 影响面。
-- **算力编排**：K8s 自动扩缩，GitHub Actions 矩阵并行（与 gemini‑cli action 集成）。([GitHub](https://github.com/google-gemini/gemini-cli "GitHub - google-gemini/gemini-cli: An open-source AI agent that brings the power of Gemini directly into your terminal."))
-- **配额与节流**：遵循 gemini‑cli 免费配额与速率限制（60 RPM/1000 RPD 以官方为准）。([GitHub](https://github.com/google-gemini/gemini-cli "GitHub - google-gemini/gemini-cli: An open-source AI agent that brings the power of Gemini directly into your terminal."))
+- **算力编排**：K8s 自动扩缩，GitHub Actions 矩阵并行，可结合自研 Action/SDK 统一管理 API 凭据与速率。
+- **配额与节流**：遵循平台提供的配额与速率限制（以运营商官方文档为准）。
 
 ---
 
@@ -431,11 +433,11 @@ while not budget_exhausted:
 
 ---
 
-## 16. GitHub Actions（与 gemini‑cli 集成）
+## 16. GitHub Actions（与 LLM API 集成）
 
 - **矩阵并发**：每个体一个 Job。
-- **步骤**：Checkout → 构建 Docker → `gemini smart-edit` 变异 → 运行 L0/L1/L2 → 上传工件（`fitness.json`/`patch.diff`/剖析报告） → 汇总 Job 计算 Pareto 与档案 → 写回报告。
-- README 中提供了官方 Action 可直接集成（PR 审阅、Issue 分拣、@gemini‑cli on-demand）。([GitHub](https://github.com/google-gemini/gemini-cli "GitHub - google-gemini/gemini-cli: An open-source AI agent that brings the power of Gemini directly into your terminal."))
+- **步骤**：Checkout → 构建 Docker → 触发 LLM API 生成补丁 → 运行 L0/L1/L2 → 上传工件（`fitness.json`/`patch.diff`/剖析报告） → 汇总 Job 计算 Pareto 与档案 → 写回报告。
+- 可复用平台提供的官方 Action/SDK 或自建步骤，完成凭据注入、日志采集与失败重试。
 
 ---
 
@@ -482,7 +484,7 @@ while not budget_exhausted:
    - AST 禁用危险 API。
    - 依赖与许可证持续审计。
 7. **上下文管理**：
-   - 利用 gemini‑cli 的长上下文与会话检查点；Prompt 只拼装必要子集，避免上下文污染。([GitHub](https://github.com/google-gemini/gemini-cli "GitHub - google-gemini/gemini-cli: An open-source AI agent that brings the power of Gemini directly into your terminal."))
+   - 利用 LLM API 的长上下文与会话检查点；Prompt 只拼装必要子集，避免上下文污染。
    - 大文档（PDF/公式）只抽取片段摘要进入 Prompt。
 8. **法律与道德**：
    - 开源合规（SPDX）与第三方素材的版权标注。
@@ -528,4 +530,4 @@ repo/
 
 ### 结语
 
-以上方案最大化复用 Gemini CLI 的工程能力（多文件编辑、Shell、Web 抓取、MCP 扩展、GitHub Actions 集成），并对齐 AlphaEvolve 的核心思想与接口约定（EVOLVE-BLOCK、搜索/替换式 diff、程序数据库/提示采样/评估池/分布式控制器）。在实践中，建议先从一两个“结构清晰、评测可靠”的算法问题启动，快速打通 M1–M2，再逐步引入 AST‑级交叉与元提示进化。
+以上方案最大化复用 LLM 推理 API 的工程能力（多模型管理、密钥权限、调用审计、限流策略），并对齐 AlphaEvolve 的核心思想与接口约定（EVOLVE-BLOCK、搜索/替换式 diff、程序数据库/提示采样/评估池/分布式控制器）。在实践中，建议先从一两个“结构清晰、评测可靠”的算法问题启动，快速打通 M1–M2，再逐步引入 AST‑级交叉与元提示进化。

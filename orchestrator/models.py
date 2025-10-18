@@ -75,6 +75,7 @@ class PromptArm:
     failures: float = 1.0
     recent_reward: float = 0.0
     horizon_generations: int = 3
+    invalid_responses: float = 0.0
 
 
 @dataclass(slots=True)
