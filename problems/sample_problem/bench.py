@@ -20,7 +20,14 @@ def run_benchmark(candidate_path: str | None = None) -> None:
         source_path=str(source),
     )
     evaluator = ProblemEvaluator("problems.sample_problem")
-    metrics = evaluator.evaluate(candidate, dataset_size=32, repeats=3, stress=True)
+    metrics, _ = evaluator.evaluate(
+        candidate,
+        dataset_size=32,
+        repeats=3,
+        stress=True,
+        percentiles=[0.5, 0.9],
+        stress_suites=["adversarial", "noisy"],
+    )
     result = {
         "accuracy": metrics.accuracy,
         "runtime_ms": metrics.runtime_ms,

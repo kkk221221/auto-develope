@@ -102,4 +102,34 @@ def test_cache_manager_uses_content_signature(tmp_path) -> None:
     assert cache.lookup(clone, "L0") is not None
     cache.invalidate(clone)
     assert cache.lookup(clone, "L0") is None
+    stats = cache.report()
+    assert stats["lookups"] == 2.0
+    assert stats["hits"] == 1.0
+
+
+def test_program_generator_crossover(tmp_path) -> None:
+    random.seed(123)
+    baseline = Path("solutions/workdir/sample_solution.py")
+    generator = ProgramGenerator(baseline_path=baseline, output_root=tmp_path / "crossover")
+    parent_a = generator.spawn_candidate("mutate.perf_first", "flash")
+    parent_b = generator.spawn_candidate("mutate.robust_first", "pro")
+    child = generator.spawn_crossover_candidate(parent_a, parent_b)
+
+    assert child.parents == (parent_a.id, parent_b.id)
+    assert Path(child.source_path).exists()
+    child_source = Path(child.source_path).read_text(encoding="utf-8")
+    assert "def solve" in child_source
+    assert child.patch_payload["metadata"]["strategy"] == "ast_mix"
+    assert child.behavior.coverage_bits
+
+
+def test_prompt_bandit_ingests_feedback() -> None:
+    random.seed(1)
+    bandit = PromptBandit.from_directory("agents/prompts")
+    arm_name, material = bandit.pick_prompt()
+    bandit.ingest_feedback(arm_name, ["L1_fail"])
+    checklist = bandit.templates[arm_name].checklist
+    assert any("L1_fail" in item for item in checklist)
+    bandit.update_reward(arm_name, 0.2)
+    assert bandit.templates[arm_name].history
 

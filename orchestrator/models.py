@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, cast
 
 
 class EvalStatus(str, Enum):
@@ -47,7 +47,7 @@ class ProgramCandidate:
     generation: int
     prompt_arm: str
     llm_backend: str
-    patch_payload: Dict[str, str]
+    patch_payload: Dict[str, object]
     problem_id: str = "sample_problem"
     source_path: str = ""
     metrics: Metrics = field(default_factory=Metrics)
@@ -113,4 +113,72 @@ class CacheEntry:
     tier: str
     metrics: Metrics
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def to_payload(self) -> Dict[str, object]:
+        """Serialises the cache entry to a JSON-friendly payload."""
+
+        return {
+            "cache_key": self.cache_key,
+            "tier": self.tier,
+            "metrics": {
+                "accuracy": self.metrics.accuracy,
+                "runtime_ms": self.metrics.runtime_ms,
+                "memory_peak_mb": self.metrics.memory_peak_mb,
+                "loc": self.metrics.loc,
+                "cyclomatic": self.metrics.cyclomatic,
+                "robustness": self.metrics.robustness,
+                "llm_style": self.metrics.llm_style,
+            },
+            "created_at": self.created_at.isoformat(),
+        }
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, object]) -> "CacheEntry":
+        """Rehydrates a cache entry from a stored payload."""
+
+        def _as_float(value: object, default: float = 0.0) -> float:
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str):
+                try:
+                    return float(value)
+                except ValueError:
+                    return default
+            return default
+
+        def _as_int(value: object, default: int = 0) -> int:
+            if isinstance(value, int):
+                return value
+            if isinstance(value, float):
+                return int(value)
+            if isinstance(value, str):
+                try:
+                    return int(value)
+                except ValueError:
+                    return default
+            return default
+
+        metrics_payload = cast(Mapping[str, object], payload.get("metrics", {}))
+        metrics = Metrics(
+            accuracy=_as_float(metrics_payload.get("accuracy", 0.0)),
+            runtime_ms=_as_float(metrics_payload.get("runtime_ms", 0.0)),
+            memory_peak_mb=_as_float(metrics_payload.get("memory_peak_mb", 0.0)),
+            loc=_as_int(metrics_payload.get("loc", 0)),
+            cyclomatic=_as_float(metrics_payload.get("cyclomatic", 0.0)),
+            robustness=_as_float(metrics_payload.get("robustness", 0.0)),
+            llm_style=_as_float(metrics_payload.get("llm_style", 0.0)),
+        )
+        created_at_raw = payload.get("created_at", "")
+        created_at_str = str(created_at_raw) if created_at_raw is not None else ""
+        created_at = (
+            datetime.fromisoformat(created_at_str)
+            if created_at_str
+            else datetime.now(timezone.utc)
+        )
+        return cls(
+            cache_key=str(payload.get("cache_key", "")),
+            tier=str(payload.get("tier", "")),
+            metrics=metrics,
+            created_at=created_at,
+        )
 

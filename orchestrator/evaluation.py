@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 from types import ModuleType
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
-from .models import EvaluationResult, Metrics, ProgramCandidate
+from .models import BehaviorFeatures, EvaluationResult, Metrics, ProgramCandidate
 
 
 @dataclass
@@ -24,6 +24,8 @@ class TierSpec:
     repeats: int = 1
     percentiles: Optional[List[float]] = None
     stress_suites: Optional[List[str]] = None
+    max_cyclomatic: Optional[int] = None
+    max_runtime_ms: Optional[float] = None
 
 
 class ProblemEvaluator:
@@ -40,7 +42,9 @@ class ProblemEvaluator:
         dataset_size: int,
         stress: bool = False,
         repeats: int = 1,
-    ) -> Metrics:
+        percentiles: Optional[Sequence[float]] = None,
+        stress_suites: Optional[Sequence[str]] = None,
+    ) -> tuple[Metrics, BehaviorFeatures]:
         scores: List[float] = []
         runtimes: List[float] = []
         for _ in range(repeats):
@@ -61,16 +65,14 @@ class ProblemEvaluator:
         memory_peak = max(runtimes) / 100.0 if runtimes else 0.0
 
         if stress:
-            stress_samples = [(0, 0), (1000, -999), (-500, 250), (1, 1)]
-            try:
-                stress_output = self._execute_solver(candidate.source_path, stress_samples)
-                stress_ref = self._oracle.evaluate_solution(stress_samples)
-                stress_score = self._score_accuracy(stress_output, stress_ref)
-            except Exception:  # pragma: no cover - defensive
-                stress_score = 0.0
-            robustness = (robustness + stress_score) / 2.0
+            stress_scores = self._run_stress_suites(
+                candidate,
+                suites=list(stress_suites or []),
+            )
+            if stress_scores:
+                robustness = (robustness + statistics.fmean(stress_scores)) / 2.0
 
-        return Metrics(
+        metrics = Metrics(
             accuracy=accuracy,
             runtime_ms=runtime_ms,
             memory_peak_mb=memory_peak,
@@ -79,6 +81,16 @@ class ProblemEvaluator:
             robustness=robustness,
             llm_style=llm_style,
         )
+        hotspots: Dict[str, float] = {"runtime_mean": runtime_ms}
+        runtime_percentiles = self._runtime_percentiles(runtimes, percentiles)
+        hotspots.update(runtime_percentiles)
+        coverage_bits = tuple(sorted({dataset_size, loc, int(cyclomatic)}))
+        behavior = BehaviorFeatures(
+            coverage_bits=coverage_bits,
+            hotspots=hotspots,
+            output_signature=f"acc:{accuracy:.3f}/rob:{robustness:.3f}",
+        )
+        return metrics, behavior
 
     def _execute_solver(self, source_path: str, samples: Iterable) -> float:
         module = self._load_module(source_path)
@@ -110,6 +122,49 @@ class ProblemEvaluator:
         except Exception:
             return 0.0
         return 1.0
+
+    def _run_stress_suites(
+        self,
+        candidate: ProgramCandidate,
+        suites: Sequence[str],
+    ) -> List[float]:
+        scores: List[float] = []
+        for suite in suites:
+            dataset = self._stress_samples_for_suite(suite)
+            if not dataset:
+                continue
+            try:
+                output = self._execute_solver(candidate.source_path, dataset)
+                reference = self._oracle.evaluate_solution(dataset)
+                scores.append(self._score_accuracy(output, reference))
+            except Exception:  # pragma: no cover - defensive
+                scores.append(0.0)
+        return scores
+
+    def _stress_samples_for_suite(self, suite: str) -> List:
+        if hasattr(self._data_gen, "generate_stress_samples"):
+            base = self._data_gen.generate_stress_samples()
+        else:  # pragma: no cover - fallback path
+            base = [(0, 0), (1000, -999), (-500, 250), (1, 1)]
+        if suite.startswith("adversarial") and hasattr(self._data_gen, "generate_adversarial_samples"):
+            return self._data_gen.generate_adversarial_samples()
+        if suite.startswith("noisy") and hasattr(self._data_gen, "generate_noisy_samples"):
+            return self._data_gen.generate_noisy_samples()
+        return base
+
+    def _runtime_percentiles(
+        self, runtimes: Sequence[float], percentiles: Optional[Sequence[float]]
+    ) -> Dict[str, float]:
+        if not runtimes or not percentiles:
+            return {}
+        sorted_runtimes = sorted(runtimes)
+        values: Dict[str, float] = {}
+        for percentile in percentiles:
+            pct = max(0.0, min(1.0, float(percentile)))
+            index = int(round((len(sorted_runtimes) - 1) * pct))
+            label = f"runtime_p{int(pct * 100):02d}"
+            values[label] = sorted_runtimes[index]
+        return values
 
     def _count_loc(self, source_path: str) -> int:
         source = Path(source_path).read_text(encoding="utf-8")
@@ -147,13 +202,18 @@ class TierExecutor:
                 metrics=Metrics(),
             )
 
-        metrics = await self._run_tests(candidate, spec)
+        metrics, behavior = await self._run_tests(candidate, spec)
         passed = metrics.accuracy >= 0.8
+        if spec.max_cyclomatic and metrics.cyclomatic > spec.max_cyclomatic:
+            passed = False
+        if spec.max_runtime_ms and metrics.runtime_ms > spec.max_runtime_ms:
+            passed = False
         return EvaluationResult(
             candidate_id=candidate.id,
             tier=tier,
             passed=passed,
             metrics=metrics,
+            behavior=behavior,
         )
 
     async def _run_checks(self, candidate: ProgramCandidate, checks: Iterable[str]) -> bool:
@@ -166,11 +226,22 @@ class TierExecutor:
                 return False
         return True
 
-    async def _run_tests(self, candidate: ProgramCandidate, spec: TierSpec) -> Metrics:
-        dataset_size = 8 if spec.name == "L1" else 32
+    async def _run_tests(self, candidate: ProgramCandidate, spec: TierSpec) -> tuple[Metrics, BehaviorFeatures]:
+        dataset_size = self._dataset_size_for_tier(spec.name)
         repeats = spec.repeats or 1
         stress = bool(spec.stress_suites)
-        return self.evaluator.evaluate(candidate, dataset_size=dataset_size, repeats=repeats, stress=stress)
+        return self.evaluator.evaluate(
+            candidate,
+            dataset_size=dataset_size,
+            repeats=repeats,
+            stress=stress,
+            percentiles=spec.percentiles,
+            stress_suites=spec.stress_suites,
+        )
+
+    def _dataset_size_for_tier(self, tier: str) -> int:
+        mapping = {"L0": 4, "L1": 16, "L2": 128, "L3": 256}
+        return mapping.get(tier, 32)
 
     async def _lint(self, candidate: ProgramCandidate) -> bool:
         try:
@@ -218,30 +289,105 @@ def load_tier_specs(config_path: Path) -> Dict[str, TierSpec]:
                     raise ValueError("Encountered property before tier declaration")
                 key, value = stripped.split(":", 1)
                 value = value.strip()
+                parsed_value: object
                 if value.startswith("[") and value.endswith("]"):
                     inner = value[1:-1].strip()
+                    parsed_items: List[object] = []
                     if inner:
-                        parsed_value = [item.strip().strip('"') for item in inner.split(",")]
-                    else:
-                        parsed_value = []
+                        for item in inner.split(","):
+                            cleaned = item.strip().strip('"')
+                            if not cleaned:
+                                continue
+                            try:
+                                parsed_items.append(int(cleaned))
+                                continue
+                            except ValueError:
+                                pass
+                            try:
+                                parsed_items.append(float(cleaned))
+                                continue
+                            except ValueError:
+                                pass
+                            parsed_items.append(cleaned)
+                    parsed_value = parsed_items
                 elif value.lower() in {"true", "false"}:
                     parsed_value = value.lower() == "true"
-                elif value.isdigit():
-                    parsed_value = int(value)
                 else:
-                    parsed_value = value.strip('"')
+                    stripped = value.strip('"')
+                    try:
+                        parsed_value = int(stripped)
+                    except ValueError:
+                        try:
+                            parsed_value = float(stripped)
+                        except ValueError:
+                            parsed_value = stripped
                 raw[current][key] = parsed_value
 
     specs: Dict[str, TierSpec] = {}
+    
+    def _ensure_list(value: object) -> List[object]:
+        if isinstance(value, list):
+            return value
+        if value is None or value == "":
+            return []
+        return [value]
+
+    def _to_float_list(values: List[object]) -> List[float]:
+        result: List[float] = []
+        for item in values:
+            if isinstance(item, (int, float)):
+                result.append(float(item))
+            elif isinstance(item, str):
+                try:
+                    result.append(float(item))
+                except ValueError:
+                    continue
+        return result
+
+    def _to_str_list(values: List[object]) -> List[str]:
+        return [str(item) for item in values]
+
+    def _to_optional_int(value: object) -> Optional[int]:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str) and value:
+            try:
+                return int(value)
+            except ValueError:
+                return None
+        return None
+
+    def _to_optional_float(value: object) -> Optional[float]:
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str) and value:
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
+
+    def _int_with_default(value: object, default: int) -> int:
+        candidate = _to_optional_int(value)
+        return candidate if candidate is not None else default
+
     for name, payload in raw.items():
+        checks = _to_str_list(_ensure_list(payload.get("checks", [])))
+        tests = _to_str_list(_ensure_list(payload.get("tests", [])))
+        percentiles = _to_float_list(_ensure_list(payload.get("percentiles", [])))
+        stress_suites = _to_str_list(_ensure_list(payload.get("stress_suites", [])))
         specs[name] = TierSpec(
             name=name,
-            timeout_s=int(payload.get("timeout_s", 60)),
-            checks=list(payload.get("checks", [])),
-            tests=list(payload.get("tests", [])),
-            repeats=int(payload.get("repeats", 1)),
-            percentiles=payload.get("percentiles"),
-            stress_suites=payload.get("stress_suites"),
+            timeout_s=_int_with_default(payload.get("timeout_s"), 60),
+            checks=checks,
+            tests=tests,
+            repeats=_int_with_default(payload.get("repeats"), 1),
+            percentiles=percentiles,
+            stress_suites=stress_suites,
+            max_cyclomatic=_to_optional_int(payload.get("max_cyclomatic")),
+            max_runtime_ms=_to_optional_float(payload.get("max_runtime_ms")),
         )
     return specs
 

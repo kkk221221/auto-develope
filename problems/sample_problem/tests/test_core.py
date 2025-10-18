@@ -2,12 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[3]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from orchestrator.evaluation import ProblemEvaluator, TierExecutor, load_tier_specs
 from orchestrator.generation import ProgramGenerator
@@ -20,9 +15,10 @@ def test_problem_evaluator_scores_candidate() -> None:
     )
     candidate = generator.spawn_candidate("mutate.perf_first", backend="flash")
     evaluator = ProblemEvaluator("problems.sample_problem")
-    metrics = evaluator.evaluate(candidate, dataset_size=16, repeats=2)
+    metrics, behavior = evaluator.evaluate(candidate, dataset_size=16, repeats=2)
     assert metrics.accuracy >= 0.95
     assert metrics.runtime_ms > 0
+    assert behavior.hotspots["runtime_mean"] == metrics.runtime_ms
 
 
 def test_tier_executor_runs_checks(tmp_path: Path) -> None:
@@ -36,3 +32,4 @@ def test_tier_executor_runs_checks(tmp_path: Path) -> None:
     tier_result = asyncio.run(executor.run(candidate, "L0"))
     assert tier_result.passed
     assert tier_result.metrics.accuracy >= 0.8
+    assert tier_result.behavior is not None

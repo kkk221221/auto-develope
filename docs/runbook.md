@@ -1,0 +1,77 @@
+# 运行手册（Runbook）
+
+本运行手册提供在本仓库部署与操作自进化算法系统的常见流程、命令及排障指引。配合《docs/self-evolving-system.md》设计说明与《docs/governance.md》《docs/observability.md》一起使用。
+
+## 1. 环境准备
+
+1. **Python 3.11**：系统以 3.11 为基线，推荐使用 `pyenv` 或项目提供的 Dockerfile。
+2. **依赖安装**：
+   ```bash
+   python -m pip install --upgrade pip
+   pip install -e .[dev]
+   ```
+   `dev` 额外安装 `pytest`、`ruff`、`mypy` 以支持 CI 与本地质量检查。
+3. **目录约定**：候选工作目录写入 `.artifacts/candidates/`，缓存目录默认为内存，可通过 `CacheManager(environment_fingerprint=..., backend=FilesystemCacheBackend(Path(".cache/evals")))` 持久化。
+
+## 2. 常见操作
+
+### 2.1 启动编排循环
+
+```bash
+python -m orchestrator.run_loop
+```
+
+该命令执行 `EvolutionOrchestrator.demo_run()`：
+- 读取 `configs/tiers.yaml` 级联配置，依序运行 L0→L3；
+- 调用 `PromptBandit` 采样提示臂，包含元提示随机化与失败反馈；
+- 使用 `ProgramGenerator.spawn_candidate()` 或 `spawn_crossover_candidate()` 产生候选；
+- 通过 `TierExecutor` 调用 `ProblemEvaluator`，获取指标与 `BehaviorFeatures`；
+- 将结果写入 `ArchiveManager`、`SelectionStrategy` 与缓存。
+
+### 2.2 运行测试与静态检查
+
+```bash
+ruff check .
+mypy orchestrator
+pytest -q
+```
+
+CI Workflow `evolve` 会在 `quality` job 中执行以上三步，确保提交满足质量门槛。
+
+### 2.3 运行基准脚本
+
+```bash
+python problems/sample_problem/bench.py
+```
+
+脚本利用 `ProblemEvaluator` 在 `stress=True`、多次重复下输出 JSON 指标，供回归分析或成本估算。
+
+## 3. 排障指南
+
+| 现象 | 可能原因 | 处理建议 |
+| --- | --- | --- |
+| **候选频繁卡在 L0** | 语法/类型检查失败、AST 黑名单命中 | 查阅 `.artifacts/candidates/<id>/` 中的源文件，确认 EVOLVE-BLOCK 范围内的语法；必要时使用 `agents/prompts/repair.v1.md` 臂重试。
+| **评测缓存未命中** | 环境指纹或补丁载荷变化 | 调用 `CacheManager.report()` 查看命中率，确认 `environment_fingerprint`、补丁 metadata 是否一致，必要时配置 `FilesystemCacheBackend` 共享缓存。
+| **L3 鲁棒性得分过低** | 未能通过 `generate_adversarial_samples`、`generate_noisy_samples` | 在 Prompt 模板中加入“对抗样例”“噪声鲁棒”检查项，或查看日志添加更严格的输入验证。
+| **CI `evolution` 作业失败** | Orchestrator 抛异常或 artifact 写入失败 | 查看 GitHub Actions 日志，确认 `python -m orchestrator.run_loop` 是否成功执行；失败时下载上传的 `.artifacts` 分析候选。
+
+## 4. 运维要点
+
+- **提示演化**：`PromptBandit.ingest_feedback()` 会在候选失败时自动标注 `Investigate <tier>_fail` 到 checklist，手工运行时亦可调用：
+  ```python
+  bandit.ingest_feedback("mutate.robust_first", ["custom_error"])
+  ```
+- **档案回放**：`ArchiveManager.state` 中的 Pareto front 与 MAP-Elites 网格可序列化保存，用于离线分析。
+- **缓存治理**：当缓存落盘时，结合 `CacheManager.report()` 观察 `lookups/hits/hit_rate`，并定期清理 `.cache/evals/*.json`。
+
+## 5. 持续集成与部署
+
+- GitHub Actions `evolution` job 以 2 轮并发矩阵演示候选评测，并上传 `.artifacts`；若需要扩展真实问题集，可在 `matrix.problem` 中添加包名，并在运行脚本前设置特定环境变量（例如切换 `ProblemEvaluator(problem_package=...)`）。
+- Docker 部署：使用项目根目录的 `Dockerfile` 构建镜像，运行容器后按上述命令启动 orchestrator 或 CLI 工具。
+
+## 6. 参考链接
+
+- 《docs/self-evolving-system.md》：总体架构与设计原则。
+- 《docs/governance.md》：安全、合规、审计要求。
+- 《docs/observability.md》：指标、日志与可视化方案。
+

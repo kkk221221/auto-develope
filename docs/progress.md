@@ -13,7 +13,7 @@
 | --- | --- | --- | --- | --- |
 | **M1：管线冷启动** | 打通候选生成→评测→档案→选择→提示奖励 | `run_loop.py`、`generation.py`、`evaluation.py`、`scheduler.py`、`prompt_policy.py` | ✅ 已完成 | 补充更多真实问题样例，验证在多问题场景下的稳定性 |
 | **M2：档案与多目标** | NSGA-II、新颖度、MAP-Elites 档案 | `selection.py`、`behaviors.py`、`models.py` | ✅ 已完成 | 引入档案持久化与可视化导出（热力图、Pareto 序列） |
-| **M3：高级交叉与压力测试** | AST/语义交叉、L3 压测、分布式评测 | `ast_crossover.py`、`evaluation.py`、`.github/workflows/evolve.yml` | ⏳ 进行中 | 实现 AST 节点拼接 + 冲突修复，补齐 L3 测试矩阵与 GitHub Actions 集成 |
+| **M3：高级交叉与压力测试** | AST/语义交叉、L3 压测、分布式评测 | `ast_crossover.py`、`evaluation.py`、`.github/workflows/evolve.yml` | ⏳ 进行中 | 已交付 AST 拼接候选 + L3 压测，后续扩展多问题集与分布式执行 |
 | **M4：元提示进化与治理** | 提示元变异、观测、审计、治理 | `prompt_policy.py`、`caching.py`、`docs/`、未来的 `observability/` 组件 | ⏳ 进行中 | 引入提示模板基因库、指标采集、run replay 工具，完善安全策略 |
 
 ## 3. 子系统梳理
@@ -35,36 +35,36 @@
   3. 与 `solutions/workdir/` 建立 Git 分支或工作树写入，记录 `patch.diff` 与谱系元数据。
 
 ### 3.3 评测级联与调度
-- **现状**：`evaluation.py` 实现 `ProblemEvaluator`、`TierExecutor`，可执行语法检查、AST 规则、数据集评估；`scheduler.py` 结合 Successive Halving 调度层级。
-- **缺口**：L3 压测与压力数据集缺失；未封装 Docker/K8s/GitHub Actions 环境；安全策略（沙箱、资源配额）未落实。
+- **现状**：`ProblemEvaluator.evaluate` 支持 L3 压测、对抗/噪声数据、运行时分位数；`TierExecutor` 依据 `TierSpec.max_cyclomatic/max_runtime_ms` 判定通过，`bench.py` 可在压力模式下输出 JSON。
+- **缺口**：容器化执行与资源隔离仍为后续工作；评测报告尚未落盘对象存储。
 - **计划**：
-  1. 扩充 `problems/sample_problem/tests/` 与 `bench.py`，加入压力测试与对抗样例。
-  2. 为 `TierExecutor` 增加容器执行后端（Docker API 或 GitHub Actions 驱动），并实现资源/网络限制。
-  3. 输出标准化评测报告（JSON），写入对象存储并在 `run_loop` 中引用。
+  1. 接入容器/K8s 执行后端，落实资源配额与网络沙箱。
+  2. 将 `EvaluationResult` 的日志与分位数写入工件，结合对象存储形成回放。
+  3. 在多问题集上回归评测，以验证压力样例的泛化效果。
 
 ### 3.4 档案、选择与品质多样性
-- **现状**：`selection.py` 维护 NSGA-II 非支配排序、拥挤距离、新颖度奖励；`behaviors.py` 定义特征提取；MAP-Elites 网格更新已实现。
-- **缺口**：行为特征仍以占位数据生成；MAP-Elites 持久化和可视化缺失；迁徙/岛屿模型未落地。
+- **现状**：评测行为特征已由 `ProblemEvaluator` 填充运行时分位数与覆盖度；`selection.py` 引入 AST 交叉与失败回退，MAP-Elites 继续更新。
+- **缺口**：MAP-Elites 快照与岛屿迁徙仍未实现；需要生成可视化报表。
 - **计划**：
-  1. 接入真实行为特征（覆盖率、热点、输出签名），需要从评测结果回传解析。
-  2. 在 `selection.py` 中实现岛屿模型与迁徙策略（定期稀疏格采样、失败驱动移民）。
-  3. 生成档案快照（CSV/JSON/可视化热力图），供 `docs/` 和观测面板使用。
+  1. 将档案快照导出为 CSV/JSON，并在 `docs/observability.md` 提到的面板中展示。
+  2. 实装岛屿迁徙策略，结合失败标签调度移民。
+  3. 为交叉流程添加冲突降级与谱系可视化。
 
 ### 3.5 缓存与可复现
-- **现状**：`caching.py` 使用内容哈希实现评测结果复用。
-- **缺口**：缺少跨进程/跨节点共享机制；缓存键未包含环境指纹；未集成指标以衡量命中率。
+- **现状**：`CacheManager` 支持环境指纹、命中率统计与 `FilesystemCacheBackend` 持久化；`CacheEntry` 可序列化 JSON。
+- **缺口**：仍需接入 Redis/数据库等共享缓存；需建立 TTL/清理策略。
 - **计划**：
-  1. 提供 Redis/数据库后端，实现跨节点缓存共享。
-  2. 扩展键结构（问题 ID、环境 fingerprint、评测配置 hash、随机种子）。
-  3. 输出缓存统计与治理策略（TTL、清理、命中率跟踪）。
+  1. 提供网络化缓存实现（如 Redis）。
+  2. 引入 TTL 与垃圾回收策略，防止磁盘膨胀。
+  3. 将缓存指标上报至可观测性面板。
 
 ### 3.6 提示工程与多臂老虎机
-- **现状**：`prompt_policy.py` 加载 `agents/prompts/*.md` 并使用 Thompson Sampling；`configs/bandit.yaml` 给出奖励配方。
-- **缺口**：模板仍为静态文件；缺少元提示变异、随机格式化、性能退火；未将失败分类反馈给提示。
+- **现状**：`PromptBandit` 引入 `PromptGenome`，支持指令随机化、温度调节、失败标签 checklist；奖励衰减结合历史轨迹。
+- **缺口**：尚未根据评测日志自动注入上下文片段；提示 A/B 统计需要持久化。
 - **计划**：
-  1. 设计 `PromptGenome` 结构体，记录模板权重、Checklist、Mutations；实现突变与交叉策略。
-  2. 基于 `evaluation` 返回的失败类型/指标，建立奖励路由与上下文注入（例如提示中动态嵌入失败日志片段）。
-  3. 引入提示 A/B 实验追踪（成功率、预算占比、平均收益）。
+  1. 将失败日志摘要注入提示上下文，形成领域化反馈。
+  2. 记录每臂调用次数与收益，导出 A/B 指标至观测面板。
+  3. 探索模板交叉/突变策略以扩大提示基因库。
 
 ### 3.7 问题库与基线解决方案
 - **现状**：`problems/sample_problem/` 提供基线问题、数据生成、测试、基准脚本；`solutions/workdir/sample_solution.py` 包含 EVOLVE-BLOCK。
@@ -75,20 +75,20 @@
   3. 为每个问题提供初始解与 EVOLVE-BLOCK 标注，确保可复现起点。
 
 ### 3.8 CI/CD 与自动化
-- **现状**：`Dockerfile`、`.github/workflows/evolve.yml`、`pyproject.toml` 支持构建与测试；`tests/` 内含单元测试覆盖档案与缓存逻辑。
-- **缺口**：CI 未串联真实评测与报告汇总；缺乏静态分析/格式化；GitHub Action 未配置密钥管理与 artifact 上传。
+- **现状**：`evolve` workflow 包含质量门禁（ruff/mypy/pytest）与两轮候选演示，并上传 `.artifacts`；`pyproject.toml` 提供 dev 依赖。
+- **缺口**：缺少 Secrets 管理与多问题矩阵；需要集成基准数据与报告汇总。
 - **计划**：
-  1. 在 workflow 中增加并发矩阵（候选评测）、artifact 上传（补丁、metrics、日志）。
-  2. 集成 `ruff`/`mypy`/`pytest`/`bench` 等检查，确保质量门禁。
-  3. 编写部署文档与示例 GitHub Action 使用说明（结合 `gemini-cli` 官方 Action）。
+  1. 扩展矩阵维度（问题集、运行模式），引入密钥管理模板。
+  2. 将评测结果汇总为 JSON artifact，供后续管线消费。
+  3. 在 README 中补充 GitHub Actions 使用指南。
 
 ### 3.9 文档、观测与治理
-- **现状**：`docs/self-evolving-system.md` 描述总体设计；`docs/progress.md` 用于追踪进度。
-- **缺口**：缺少操作手册、API 文档、治理策略细则（安全、合规、审计）；缺少观测面板与图表。
+- **现状**：新增《docs/runbook.md》《docs/governance.md》《docs/observability.md》覆盖操作、治理、指标；总体设计与进度文档同步更新。
+- **缺口**：开发者 API 指南仍待撰写；观测面板需落地原型。
 - **计划**：
-  1. 编写《运行手册》《开发者指南》《治理与安全策略》三大文档。
-  2. 设计观测面板（Grafana/Streamlit）原型，展示吞吐、档案热力图、失败分类等。
-  3. 提供审计流程（变更记录、日志格式、Run Replay 指南）。
+  1. 编写 API/模块参考文档，便于扩展模块接入。
+  2. 实现观测面板 MVP（Streamlit 或 Grafana）。
+  3. 形成 run replay 指南与自动化报表模板。
 
 ## 4. 综合路线图
 
@@ -119,11 +119,11 @@
 
 ## 6. 近期交付检查清单
 
-- [ ] `ast_crossover.py`：实现补丁拼接 → AST 片段组合 → 语义合并最小版。
-- [ ] `evaluation.py`：新增 L3 压测入口、压力数据、资源限制。
-- [ ] `prompt_policy.py`：引入元提示变异（权重/Checklist/示例采样）。
-- [ ] `caching.py`：支持外部缓存后端与命中率指标。
-- [ ] `docs/`：补充运行手册、治理策略、观测面板草图。
-- [ ] `.github/workflows/evolve.yml`：并发矩阵、artifact 上传、静态检查。
+- [x] `ast_crossover.py`：实现补丁拼接 → AST 片段组合 → 语义合并最小版。
+- [x] `evaluation.py`：新增 L3 压测入口、压力数据、资源限制。
+- [x] `prompt_policy.py`：引入元提示变异（权重/Checklist/示例采样）。
+- [x] `caching.py`：支持外部缓存后端与命中率指标。
+- [x] `docs/`：补充运行手册、治理策略、观测面板草图。
+- [x] `.github/workflows/evolve.yml`：并发矩阵、artifact 上传、静态检查。
 
 > 随着功能推进，此文档将持续更新，确保每个里程碑的工作量、依赖关系与风险透明可跟踪。

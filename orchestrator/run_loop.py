@@ -91,6 +91,7 @@ class EvolutionOrchestrator:
                 LOGGER.info(
                     "Candidate %s failed tier %s; halting cascade", candidate.id, tier
                 )
+                self.prompt_bandit.ingest_feedback(candidate.prompt_arm, [f"{tier}_fail"])
                 break
         else:
             LOGGER.info("Candidate %s completed all tiers", candidate.id)

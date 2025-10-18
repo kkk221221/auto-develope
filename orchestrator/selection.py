@@ -1,6 +1,7 @@
 """Candidate selection and archive maintenance utilities."""
 from __future__ import annotations
 
+import logging
 import math
 import random
 from dataclasses import dataclass, field
@@ -12,6 +13,8 @@ if TYPE_CHECKING:  # pragma: no cover - type checking only
     from .generation import ProgramGenerator
     from .prompt_policy import PromptBandit
 
+
+LOGGER = logging.getLogger(__name__)
 
 OBJECTIVES: Sequence[Tuple[str, bool]] = (
     ("accuracy", True),
@@ -234,6 +237,14 @@ class SelectionStrategy:
     ) -> Optional[ProgramCandidate]:
         if not self._population:
             return None
+        if len(self._population) >= 2 and random.random() < 0.35:
+            parents = self._sample_parent_pair()
+            if parents:
+                parent_a, parent_b = parents
+                try:
+                    return generator.spawn_crossover_candidate(parent_a, parent_b)
+                except Exception as exc:  # pragma: no cover - defensive path
+                    LOGGER.debug("Crossover failed, falling back to mutation: %s", exc)
         parent = self._sample_parent()
         if not parent:
             return None
@@ -246,17 +257,30 @@ class SelectionStrategy:
             generation=parent.generation + 1,
         )
 
-    def _sample_parent(self) -> Optional[ProgramCandidate]:
+    def _sample_parent_pair(self) -> Optional[Tuple[ProgramCandidate, ProgramCandidate]]:
+        first = self._sample_parent()
+        if not first:
+            return None
+        exclude = {first.id}
+        for _ in range(5):
+            second = self._sample_parent(exclude)
+            if second and second.id not in exclude:
+                return first, second
+        return None
+
+    def _sample_parent(self, exclude: Optional[set[str]] = None) -> Optional[ProgramCandidate]:
+        exclude = exclude or set()
         fronts = self.archive.get_fronts()
         if not fronts:
-            return random.choice(list(self._population.values()))
+            choices = [cand for cid, cand in self._population.items() if cid not in exclude]
+            return random.choice(choices) if choices else None
         weighted: List[Tuple[float, ProgramCandidate]] = []
         for rank, front in enumerate(fronts):
             if not front:
                 continue
             distances = _crowding_distance(front)
             for candidate in front:
-                if candidate.id not in self._population:
+                if candidate.id not in self._population or candidate.id in exclude:
                     continue
                 novelty_factor = math.exp(
                     min(candidate.novelty_score, 5.0) * self.novelty_alpha / max(self.novelty_tau, 1)
@@ -266,7 +290,8 @@ class SelectionStrategy:
                 weight = rank_weight * (1.0 + distance) * novelty_factor
                 weighted.append((weight, candidate))
         if not weighted:
-            return random.choice(list(self._population.values()))
+            choices = [cand for cid, cand in self._population.items() if cid not in exclude]
+            return random.choice(choices) if choices else None
         total = sum(weight for weight, _ in weighted)
         pick = random.random() * total
         cumulative = 0.0

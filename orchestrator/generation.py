@@ -6,9 +6,10 @@ import textwrap
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Iterable, Tuple
+from typing import Callable, Dict, Tuple, cast
 
-from .models import ProgramCandidate
+from .ast_crossover import perform_ast_crossover
+from .models import BehaviorFeatures, ProgramCandidate
 
 
 def _replace_evolve_block(source: str, new_block: str) -> str:
@@ -125,9 +126,11 @@ class ProgramGenerator:
         candidate_dir.mkdir(parents=True, exist_ok=False)
         candidate_path = candidate_dir / self.baseline_path.name
         candidate_path.write_text(mutated_source, encoding="utf-8")
-        patch_payload = {
+        metadata = cast(Dict[str, object], {"arm": arm_key, "strategy": "mutation"})
+        patch_payload: Dict[str, object] = {
             "diff_type": "sr",
             "payload": textwrap.dedent(snippet).strip(),
+            "metadata": metadata,
         }
         parent_ids = tuple(parents or ())
         return ProgramCandidate(
@@ -138,5 +141,34 @@ class ProgramGenerator:
             llm_backend=backend,
             patch_payload=patch_payload,
             source_path=str(candidate_path),
+        )
+
+    def spawn_crossover_candidate(
+        self,
+        parent_a: ProgramCandidate,
+        parent_b: ProgramCandidate,
+    ) -> ProgramCandidate:
+        """Produces a child candidate via AST-guided crossover."""
+
+        result = perform_ast_crossover(
+            parent_a,
+            parent_b,
+            base_source=self.baseline_source,
+        )
+        candidate_id = uuid.uuid4().hex
+        candidate_dir = self.output_root / candidate_id
+        candidate_dir.mkdir(parents=True, exist_ok=False)
+        candidate_path = candidate_dir / self.baseline_path.name
+        candidate_path.write_text(result.merged_source, encoding="utf-8")
+
+        return ProgramCandidate(
+            id=candidate_id,
+            parents=(parent_a.id, parent_b.id),
+            generation=max(parent_a.generation, parent_b.generation) + 1,
+            prompt_arm="crossover.ast_mix",
+            llm_backend=parent_a.llm_backend,
+            patch_payload=result.patch_payload,
+            source_path=str(candidate_path),
+            behavior=result.behavior or BehaviorFeatures(),
         )
 
