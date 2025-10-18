@@ -57,6 +57,8 @@ class ProgramCandidate:
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     evaluated_at: Optional[datetime] = None
     novelty_score: float = 0.0
+    pareto_rank: int = 0
+    crowding_distance: float = 0.0
 
 
 @dataclass(slots=True)

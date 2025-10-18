@@ -108,7 +108,14 @@ class ProgramGenerator:
         self.baseline_source = self.baseline_path.read_text(encoding="utf-8")
         self.output_root.mkdir(parents=True, exist_ok=True)
 
-    def spawn_candidate(self, arm: str, backend: str) -> ProgramCandidate:
+    def spawn_candidate(
+        self,
+        arm: str,
+        backend: str,
+        *,
+        parents: Tuple[str, ...] | None = None,
+        generation: int = 0,
+    ) -> ProgramCandidate:
         arm_key = arm.split(".", 1)[-1]
         snippet_factory = MUTATION_SNIPPETS.get(arm_key, _baseline_variant)
         snippet = snippet_factory()
@@ -122,10 +129,11 @@ class ProgramGenerator:
             "diff_type": "sr",
             "payload": textwrap.dedent(snippet).strip(),
         }
+        parent_ids = tuple(parents or ())
         return ProgramCandidate(
             id=candidate_id,
-            parents=tuple(),
-            generation=0,
+            parents=parent_ids,
+            generation=generation,
             prompt_arm=arm,
             llm_backend=backend,
             patch_payload=patch_payload,

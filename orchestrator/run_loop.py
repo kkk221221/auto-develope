@@ -14,7 +14,14 @@ from .behaviors import extract_behavior_features
 from .caching import CacheManager
 from .evaluation import ProblemEvaluator, TierExecutor, load_tier_specs
 from .generation import ProgramGenerator
-from .models import ArchiveState, EvalStatus, EvaluationResult, ProgramCandidate, SchedulerConfig
+from .models import (
+    ArchiveState,
+    EvalStatus,
+    EvaluationResult,
+    Metrics,
+    ProgramCandidate,
+    SchedulerConfig,
+)
 from .prompt_policy import PromptBandit
 from .scheduler import EvaluationScheduler
 from .selection import ArchiveManager, SelectionStrategy
@@ -71,11 +78,13 @@ class EvolutionOrchestrator:
                     candidate_id=candidate.id,
                     tier=tier,
                     passed=True,
-                    metrics=cached.metrics,
+                    metrics=Metrics(**asdict(cached.metrics)),
                 )
             else:
                 LOGGER.debug("Scheduling candidate %s for tier %s", candidate.id, tier)
                 result = await self.scheduler.run_tier(candidate, tier)
+                if result.passed:
+                    self.cache_manager.record(candidate, result)
 
             candidate = self._apply_result(candidate, result)
             if not result.passed:
@@ -88,8 +97,9 @@ class EvolutionOrchestrator:
 
         self.archive_manager.update(candidate)
         self.selection_strategy.observe_candidate(candidate)
-        self.prompt_bandit.update_reward(candidate.prompt_arm, candidate.metrics.accuracy)
-        next_candidate = self.selection_strategy.select_next()
+        reward = self._score_prompt_reward(candidate.metrics)
+        self.prompt_bandit.update_reward(candidate.prompt_arm, reward)
+        next_candidate = self.selection_strategy.select_next(self.program_generator, self.prompt_bandit)
         if next_candidate:
             LOGGER.info("Selected candidate %s for future evaluation", next_candidate.id)
             self.pending_candidates.append(next_candidate)
@@ -121,6 +131,13 @@ class EvolutionOrchestrator:
         )
         return updated_candidate
 
+    def _score_prompt_reward(self, metrics: Metrics) -> float:
+        accuracy_component = max(0.0, min(1.0, metrics.accuracy))
+        runtime_norm = 1.0 / (1.0 + max(metrics.runtime_ms, 0.0) / 100.0)
+        robustness_component = max(0.0, min(1.0, metrics.robustness))
+        reward = 0.6 * accuracy_component + 0.3 * runtime_norm + 0.1 * robustness_component
+        return max(0.0, min(1.0, reward))
+
     async def run(self, max_steps: Optional[int] = None) -> List[ProgramCandidate]:
         """Continuously executes orchestration steps until completion."""
 
@@ -147,8 +164,14 @@ async def demo_run() -> None:
     )
     prompt_bandit = PromptBandit.from_directory("agents/prompts")
     default_arm = next(iter(prompt_bandit.arms))
-    selection = SelectionStrategy(population_size=4, default_prompt_arm=default_arm)
     archive_manager = ArchiveManager(ArchiveState())
+    selection = SelectionStrategy(
+        population_size=4,
+        archive=archive_manager,
+        default_prompt_arm=default_arm,
+        novelty_alpha=scheduler_config.novelty_alpha,
+        novelty_tau=scheduler_config.novelty_tau,
+    )
     cache_manager = CacheManager()
     baseline_path = Path("solutions/workdir/sample_solution.py")
     generator = ProgramGenerator(baseline_path=baseline_path, output_root=Path(".artifacts/candidates"))

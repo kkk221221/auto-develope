@@ -49,10 +49,16 @@ class PromptBandit:
         chosen_name = max(scored, key=scored.get)
         return chosen_name, self.templates[chosen_name]
 
+    def backend_for_arm(self, arm_name: str) -> str:
+        template = self.templates.get(arm_name)
+        if template:
+            return template.backend
+        return "flash"
+
     def update_reward(self, arm_name: str, reward: float) -> None:
         arm = self.arms[arm_name]
-        if reward > 0.5:
-            arm.successes += 1.0
-        else:
-            arm.failures += 1.0
-        arm.recent_reward = reward
+        clipped = max(0.0, min(1.0, reward))
+        decay = max(0.0, (arm.horizon_generations - 1) / max(arm.horizon_generations, 1))
+        arm.successes = 1.0 + decay * (arm.successes - 1.0) + clipped
+        arm.failures = 1.0 + decay * (arm.failures - 1.0) + (1.0 - clipped)
+        arm.recent_reward = clipped
