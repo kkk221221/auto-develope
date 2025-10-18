@@ -19,6 +19,9 @@
    - `ProgramGenerator`、`perform_ast_crossover` 生成的 `patch_payload.metadata` 记录策略与说明，方便审计。
 3. **提示防护**：
    - `PromptBandit` 在 `ingest_feedback` 中对失败标签进行标准化（`Investigate <tag>`），避免原始日志注入指令；
+   - 默认系统提示（`DEFAULT_SYSTEM_PROMPT`）强制 LLM 输出 `{version:1, patches:[{diff_type:"sr", ...}]}` 结构，若模型偏离会被 `LLMApiAgentAdapter` 拒绝；
+   - 演化请求携带 `problem_id`、目标文件路径与 EVOLVE-BLOCK 原始文本上下文，确保 `payload.search` 锚点可审计、可重放；
+   - `ProgramGenerator` 追加提示校验（例如 EVOLVE 块中若存在 `def solve`，LLM 补丁必须保留该定义），不满足时自动回退模板并在提示遥测中记录 `PromptValidationError`；
    - 元提示演化仅调整权重、顺序与 checklist，禁止注入动态执行代码。
 
 ## 3. 合规要求
@@ -31,9 +34,11 @@
 
 ## 4. 审计与回放
 
-1. **档案追踪**：`ArchiveManager.state` 中保存 Pareto front 与 MAP-Elites cell，可定期导出 CSV/JSON。
-2. **补丁回放**：每个候选目录包含完整源码，可通过 Git 分支或 `patch_payload` 复现；`CrossoverPlan.description` 有助于理解交叉组合方式。
-3. **事件记录**：建议在后续引入 OpenTelemetry，将 `EvolutionOrchestrator`、`PromptBandit` 的关键事件（提示臂选取、奖励、失败标签）写入集中式日志。
+1. **档案追踪**：`ArchiveManager.state` 保存 Pareto front 与 MAP-Elites cell，`map_elites.json`、`dashboard.html` 在每轮运行后自动生成，可定期导出 CSV/JSON。
+2. **补丁回放**：`.artifacts/candidates/<id>/` 存放候选源码，`.artifacts/git_lineage/` 记录 commit + patch metadata，可按 `patch_payload` 或 Git 索引复现；`CrossoverPlan.description` 有助于理解交叉组合方式。
+3. **运行快照**：`FilesystemPersistence` 写入 `.artifacts/run_state.json`，涵盖候选队列、Bandit 权重、缓存摘要，支持断点续跑与离线审计。
+4. **提示遥测**：`.artifacts/prompt_telemetry.json` 追踪每个臂的成功率、最新奖励、checklist 变更，属于提示治理的主数据源。
+5. **事件记录**：若需集中可观测性，可在现有 JSON 工件基础上引入 OpenTelemetry，将 `EvolutionOrchestrator`、`PromptBandit` 的关键事件（提示臂选取、奖励、失败标签）推送至日志/指标系统。
 
 ## 5. 变更流程
 

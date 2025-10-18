@@ -30,6 +30,14 @@ except Exception:  # pragma: no cover - defensive fallback
 
 from .prompt_policy import PromptMaterialization
 
+
+DEFAULT_SYSTEM_PROMPT = (
+    "You are an automated code-evolution agent. Respond with a single JSON object "
+    "using compact formatting and no surrounding text. The JSON MUST match the schema "
+    '{"version":1,"patches":[{"diff_type":"sr","file":"<problem_file>","payload":{"search":"<existing block>","replace":"<replacement block>"}}],"telemetry_tags":[]}.'
+    "Rules: (1) version is always 1. (2) patches is an array; use an empty array if you have no safe change. (3) Each patch must set diff_type to \"sr\". (4) payload.search is an exact substring from the existing EVOLVE block, payload.replace is the full replacement block. (5) file must be one of the following based on the problem id in the user prompt: sample_problem -> solutions/workdir/sample_solution.py; shortest_path -> solutions/workdir/shortest_path_solution.py; knapsack -> solutions/workdir/knapsack_solution.py. (6) Do not emit markdown, code fences, comments, explanations, or additional keys."
+)
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -165,10 +173,8 @@ class LLMApiAgentAdapter:
         )
         self.temperature = temperature
         self.timeout_s = timeout_s
-        self.system_prompt = system_prompt or os.getenv(
-            "LLM_API_SYSTEM_PROMPT",
-            "You are a helpful assistant that returns JSON patches for code evolution.",
-        )
+        env_prompt = os.getenv("LLM_API_SYSTEM_PROMPT")
+        self.system_prompt = system_prompt or env_prompt or DEFAULT_SYSTEM_PROMPT
         self.stream = stream
         self._rate_limiter = rate_limiter or _GLOBAL_RATE_LIMITER
         self._max_retries = max(0, max_retries)

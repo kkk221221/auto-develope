@@ -12,7 +12,7 @@
    ```
    `dev` 额外安装 `pytest`、`ruff`、`mypy` 以支持 CI 与本地质量检查。
 3. **目录约定**：候选工作目录写入 `.artifacts/candidates/`，缓存目录默认为内存，可通过 `CacheManager(environment_fingerprint=..., backend=FilesystemCacheBackend(Path(".cache/evals")))` 持久化。
-4. **LLM API 凭据管理**：将访问令牌保存在 CI/CD 密钥或本地 `.env` 文件中，运行前导出 `LLM_API_KEY`；如需细粒度审计，可结合密钥轮换服务或使用短期会话令牌。
+4. **LLM API 凭据管理**：将访问令牌保存在 CI/CD 密钥或本地 `.env` 文件中，运行前导出 `LLM_API_KEY`；如需细粒度审计，可结合密钥轮换服务或使用短期会话令牌。系统内置 `DEFAULT_SYSTEM_PROMPT` 约束 LLM 输出结构，如需自定义可显式设置 `LLM_API_SYSTEM_PROMPT`，但必须保持 `version=1`、`diff_type="sr"` 的 JSON schema。
 
 ## 2. 常见操作
 
@@ -31,6 +31,7 @@ python -m orchestrator.run_loop
 - 将结果写入 `ArchiveManager`、`SelectionStrategy` 与缓存。
 - 将 MAP-Elites 快照写入 `.artifacts/map_elites.json` 并自动渲染 `.artifacts/dashboard.html` 热力图，同时把提示臂遥测导出至 `.artifacts/prompt_telemetry.json`。
 - 通过 `GitLineageTracker` 将候选源代码与补丁元数据提交至 `.artifacts/git_lineage/` Git 仓库，便于审计与回放。
+- 每次 step 结束都会刷新 `.artifacts/run_state.json`，其中包含候选队列、Bandit 权重与缓存统计；若想从干净状态启动，可删除该文件重新运行。
 
 > ℹ️ Demo 运行会自动启用 `FilesystemPersistence`，将档案、种群、Bandit 状态、缓存摘要与待评估队列写入 `.artifacts/run_state.json`。重新执行命令将从快照恢复；如需重新开始，可手动删除该文件。
 
@@ -77,7 +78,8 @@ python problems/knapsack/bench.py
 | **候选频繁卡在 L0** | 语法/类型检查失败、AST 黑名单命中 | 查阅 `.artifacts/candidates/<id>/` 中的源文件，确认 EVOLVE-BLOCK 范围内的语法；必要时使用 `agents/prompts/repair.v1.md` 臂重试。
 | **评测缓存未命中** | 环境指纹或补丁载荷变化 | 调用 `CacheManager.report()` 查看命中率，确认 `environment_fingerprint`、补丁 metadata 是否一致，必要时配置 `FilesystemCacheBackend` 共享缓存。
 | **L3 鲁棒性得分过低** | 未能通过 `generate_adversarial_samples`、`generate_noisy_samples` | 在 Prompt 模板中加入“对抗样例”“噪声鲁棒”检查项，或查看日志添加更严格的输入验证。
-| **CI `evolution` 作业失败** | Orchestrator 抛异常或 artifact 写入失败 | 查看 GitHub Actions 日志，确认 `python -m orchestrator.run_loop` 是否成功执行；失败时下载上传的 `.artifacts` 分析候选，并检查 `dashboard.html` 与 `prompt_telemetry.json` 是否生成。
+| **CI `evolution` 作业失败** | Orchestrator 抛异常或 artifact 写入失败 | 查看 GitHub Actions 日志，确认 `python -m orchestrator.run_loop` 是否成功执行；失败时下载上传的 `.artifacts` 分析候选，并检查 `dashboard.html`、`prompt_telemetry.json` 与 `run_state.json` 是否生成。
+| **LLM 输出被拒绝** | 缺少 `version`/`diff_type="sr"` 或 `payload.replace` 非完整 EVOLVE block | 检查 orchestrator 日志中的 `LLM API fallback` 警告，修订提示模板 checklist 或补充上下文后重试。
 
 ## 4. 运维要点
 
@@ -85,6 +87,7 @@ python problems/knapsack/bench.py
   ```python
   bandit.ingest_feedback("mutate.robust_first", ["custom_error"])
   ```
+- **提示遥测**：`PromptBandit.export_telemetry()` 会刷新 `.artifacts/prompt_telemetry.json`，记录各臂奖励、温度与 checklist。若某臂奖励长期低于 0.3，可调整提示指令或增加 few-shot 示例后观察变化。
 - **档案回放**：`ArchiveManager.state` 中的 Pareto front 与 MAP-Elites 网格可序列化保存，用于离线分析；也可直接使用自动导出的 `.artifacts/map_elites.json` 与 `.artifacts/dashboard.html`。
 - **缓存治理**：当缓存落盘时，结合 `CacheManager.report()` 观察 `lookups/hits/hit_rate`，并定期清理 `.cache/evals/*.json`。
 

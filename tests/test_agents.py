@@ -6,7 +6,7 @@ from typing import Callable
 import pytest
 
 from orchestrator.agents import LLMApiAgentAdapter, LLMApiAgentError, _NoopRateLimiter
-from orchestrator.prompt_policy import PromptMaterialization
+from orchestrator.prompt_policy import PromptBandit, PromptMaterialization
 
 
 def _fake_completion_factory(payload: dict[str, object]) -> Callable[[PromptMaterialization], str]:
@@ -139,3 +139,12 @@ def test_llm_api_adapter_rejects_missing_version() -> None:
     )
     with pytest.raises(LLMApiAgentError):
         adapter.generate(prompt)
+
+
+def test_prompt_bandit_tracks_invalid_responses(tmp_path) -> None:
+    bandit = PromptBandit.from_directory("agents/prompts")
+    arm_name, _ = bandit.pick_prompt()
+    bandit.register_invalid_response(arm_name, "schema_error")
+    telemetry = bandit.telemetry()
+    assert telemetry["arms"][arm_name]["invalid_responses"] == 1.0
+    assert telemetry["arms"][arm_name]["invalid_reasons"]["schema_error"] == 1

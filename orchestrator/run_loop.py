@@ -358,6 +358,7 @@ async def demo_run() -> None:
         output_root=Path(".artifacts/candidates"),
         agent=agent,
         lineage_tracker=lineage_tracker,
+        prompt_bandit=prompt_bandit,
     )
     persistence = FilesystemPersistence(Path(".artifacts/run_state.json"))
 

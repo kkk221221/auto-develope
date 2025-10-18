@@ -3,11 +3,19 @@ from __future__ import annotations
 
 import json
 import random
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
 
 from .models import PromptArm
+
+
+JSON_SCHEMA_GUIDANCE: Sequence[str] = (
+    "Output strictly a minified JSON object matching this schema (no markdown or prose):",
+    '{"version":1,"patches":[{"diff_type":"sr","file":"<problem_file>","payload":{"search":"<existing block>","replace":"<replacement block>"}}],"telemetry_tags":[]}',
+    "Use \"patches\":[] if you truly have no safe change.\n- diff_type must stay \"sr\".\n- payload.search must be an exact substring copied from the EVOLVE block shown in context.\n- payload.replace must contain the entire EVOLVE block after your edits (include unchanged lines, only update what you modify).\n- file must map from the problem id: sample_problem -> solutions/workdir/sample_solution.py, shortest_path -> solutions/workdir/shortest_path_solution.py, knapsack -> solutions/workdir/knapsack_solution.py.",
+)
 
 
 @dataclass
@@ -62,6 +70,9 @@ class PromptGenome:
         for idx, instruction in enumerate(instructions, 1):
             emphasis = 1.0 + (idx * 0.05) + (0.5 - self.temperature)
             lines.append(f"{idx}. ({emphasis:.2f}) {instruction}")
+        if JSON_SCHEMA_GUIDANCE:
+            lines.append("")
+            lines.extend(JSON_SCHEMA_GUIDANCE)
         if self.checklist:
             lines.append("")
             lines.append("Checklist:")
@@ -142,6 +153,7 @@ class PromptBandit:
     def __init__(self, arms: Dict[str, PromptArm], templates: Dict[str, PromptGenome]) -> None:
         self.arms = arms
         self.templates = templates
+        self._invalid_reason_histograms: Dict[str, MutableMapping[str, int]] = defaultdict(dict)
 
     @classmethod
     def from_directory(cls, directory: str) -> "PromptBandit":
@@ -286,6 +298,8 @@ class PromptBandit:
                 "failures": arm.failures,
                 "recent_reward": arm.recent_reward,
                 "horizon_generations": arm.horizon_generations,
+                "invalid_responses": arm.invalid_responses,
+                "invalid_reasons": dict(self._invalid_reason_histograms.get(name, {})),
             }
             for name, arm in self.arms.items()
         }
@@ -300,6 +314,7 @@ class PromptBandit:
     def restore(self, snapshot: Mapping[str, Any]) -> None:
         """Restores bandit state from a snapshot payload."""
 
+        self._invalid_reason_histograms = defaultdict(dict)
         arms_payload = snapshot.get("arms", {})
         if isinstance(arms_payload, Mapping):
             for name, payload in arms_payload.items():
@@ -318,8 +333,16 @@ class PromptBandit:
                     arm.failures = float(payload.get("failures", arm.failures))
                     arm.recent_reward = float(payload.get("recent_reward", arm.recent_reward))
                     arm.horizon_generations = int(payload.get("horizon_generations", arm.horizon_generations))
+                    arm.invalid_responses = float(payload.get("invalid_responses", arm.invalid_responses))
                 except (TypeError, ValueError):  # pragma: no cover - defensive
                     continue
+                reasons = payload.get("invalid_reasons")
+                if isinstance(reasons, Mapping):
+                    self._invalid_reason_histograms[name] = {
+                        str(reason): int(count)
+                        for reason, count in reasons.items()
+                        if isinstance(count, (int, float))
+                    }
         templates_payload = snapshot.get("templates", {})
         if isinstance(templates_payload, Mapping):
             for name, payload in templates_payload.items():
@@ -363,6 +386,8 @@ class PromptBandit:
                 "temperature": self.templates[name].temperature
                 if name in self.templates
                 else None,
+                "invalid_responses": arm.invalid_responses,
+                "invalid_reasons": dict(self._invalid_reason_histograms.get(name, {})),
             }
             for name, arm in self.arms.items()
         }
@@ -382,3 +407,20 @@ class PromptBandit:
         payload = self.telemetry()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def register_invalid_response(self, arm_name: str, reason: str) -> None:
+        """Record that a prompt arm produced an invalid LLM response."""
+
+        arm = self.arms.get(arm_name)
+        if not arm:
+            return
+        arm.invalid_responses += 1.0
+        bucket = self._invalid_reason_histograms.setdefault(arm_name, {})
+        reason_key = reason[:160] if reason else "unknown"
+        bucket[reason_key] = int(bucket.get(reason_key, 0)) + 1
+        arm.recent_reward = 0.0
+        genome = self.templates.get(arm_name)
+        if genome:
+            note = f"Address invalid output ({reason_key})"
+            if note not in genome.checklist:
+                genome.checklist.append(note)

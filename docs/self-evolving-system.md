@@ -149,11 +149,12 @@ archive:
   - `unified diff`（大改动/跨文件）。
   - **SEARCH/REPLACE**（对齐 AlphaEvolve 的局部替换语法，定位精确、可幂等）。
 - 大仓改动必须先输出迁移计划（多步小补丁），再按步执行。
+- 默认系统提示 `DEFAULT_SYSTEM_PROMPT` 强制 LLM 输出 `{"version":1,"patches":[{"diff_type":"sr",...}]}`，若模型偏离该 schema 将被 `LLMApiAgentAdapter` 拒绝并触发模板回退。
 
 ### 3.2 Prompt Sampler（信息来源与组装）
 
-- **来源**：Program DB 的精英/失败多样本、行为远点（novel）、用户背景 PDF/公式、评测摘要。
-- **组装**：Few-shot 引入 2–3 个高分方案及“失败→修复”的因果链；随机格式化增强多样性；目标权重随代数退火。
+- **来源**：Program DB 的精英/失败多样本、行为远点（novel）、用户背景 PDF/公式、评测摘要、`.artifacts/prompt_telemetry.json` 中的奖励趋势。
+- **组装**：Few-shot 引入 2–3 个高分方案及“失败→修复”的因果链；随机格式化增强多样性；目标权重随代数退火；请求载荷中附带 `problem_id`、目标文件路径及当前 EVOLVE-BLOCK 源码，为 `payload.search` 提供精确锚点。
 
 ### 3.3 生成级联与模型分工
 
@@ -166,6 +167,7 @@ archive:
 - 臂 = 模板变体（性能优先/鲁棒优先/简洁优先/探索优先）。
 - 奖励 = `0.6*Δacc + 0.3*Δruntime_gain + 0.1*Δrobust`（3 代滚动）。
 - 算法：**Thompson Sampling**；冷启均匀探索，热启承继历史。
+- 遥测：每个 step 后导出 `.artifacts/prompt_telemetry.json`，记录成功率、温度、checklist、最新奖励与 `invalid_responses` 计数，供治理与告警使用。
 
 ### 3.5 元提示进化（Meta‑Prompt Evolution）
 

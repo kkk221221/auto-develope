@@ -5,8 +5,8 @@
 ## 0. 当前完成度快照
 
 - **整体完成度估算**：约 75%。`EvolutionOrchestrator` 已串联候选生成 → 评测级联 → 档案更新 → 提示奖励 → 持久化快照，三类问题集（示例、最短路、背包）均可端到端运行。
-- **核心交付能力**：`ProgramGenerator` 支持模板变异、AST 交叉、自动 repair，并将谱系写入 `.artifacts/git_lineage/`；`ProblemEvaluator` 和 `TierExecutor` 执行 L0–L3 级联、压力样例与分位数统计；`ArchiveManager` + `SelectionStrategy` 实现 NSGA-II 与 MAP-Elites；`PromptBandit` 跟踪提示奖励并导出遥测；`FilesystemPersistence`、`CacheManager` 提供快照与缓存。
-- **最新验证**：`pytest -q`（26 项）全部通过；`.github/workflows/evolve.yml` 在 Python 3.11 上执行 lint（Ruff）、类型检查（mypy）与多问题矩阵 demo，确保主干稳定。
+- **核心交付能力**：`ProgramGenerator` 支持模板变异、AST 交叉、自动 repair，并将谱系写入 `.artifacts/git_lineage/`；`LLMApiAgentAdapter` 结合默认系统提示与上下文 EVOLVE block，确保 LLM 返回符合 `diff_type="sr"` 的 JSON 补丁；`ProblemEvaluator` 和 `TierExecutor` 执行 L0–L3 级联、压力样例与分位数统计；`ArchiveManager` + `SelectionStrategy` 实现 NSGA-II 与 MAP-Elites；`PromptBandit` 跟踪提示奖励并导出遥测；`FilesystemPersistence`、`CacheManager` 提供快照与缓存。
+- **最新验证**：`pytest -q`（26 项）全部通过；`.github/workflows/evolve.yml` 在 Python 3.11 上执行 lint（Ruff）、类型检查（mypy）与多问题矩阵 demo；本地使用真实 Qwen API 多轮运行 `python -m orchestrator.run_loop`，已观察到合法补丁写入 `.artifacts/candidates/`，并在 `prompt_telemetry.json` 中记录奖励。
 - **主要缺口**：评测仍为单机执行，缺乏容器/K8s 调度；观测面板仅有静态 HTML；外部持久化、提示反馈分析、成本审计工具链尚未完备。
 
 ## 0. 当前完成度快照
