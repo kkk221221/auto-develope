@@ -1,0 +1,7 @@
+arms:
+  - perf_first
+  - robust_first
+  - simplicity_first
+  - exploration
+reward: 0.6*acc_gain + 0.3*time_gain + 0.1*robust_gain
+horizon_gens: 3

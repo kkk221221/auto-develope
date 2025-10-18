@@ -1,0 +1,21 @@
+scheduler:
+  population: 64
+  retention:
+    L0: 0.65
+    L1: 0.40
+    L2: 0.20
+    L3: 0.05
+  budgets_s:
+    L0: 10
+    L1: 60
+    L2: 360
+    L3: 1200
+novelty:
+  probes: 128
+  metric: cosine
+  alpha_0: 1.0
+  tau: 8
+map_elites:
+  bins:
+    complexity: 8
+    robustness: 8

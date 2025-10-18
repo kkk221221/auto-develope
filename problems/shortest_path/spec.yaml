@@ -1,0 +1,7 @@
+id: shortest_path
+objective: average shortest path distance
+metrics:
+  - accuracy
+  - runtime_ms
+  - robustness
+  - memory_peak_mb

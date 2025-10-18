@@ -1,0 +1,19 @@
+{
+  "problems": [
+    {
+      "id": "sample_problem",
+      "package": "problems.sample_problem",
+      "baseline": "solutions/workdir/sample_solution.py"
+    },
+    {
+      "id": "shortest_path",
+      "package": "problems.shortest_path",
+      "baseline": "solutions/workdir/shortest_path_solution.py"
+    },
+    {
+      "id": "knapsack",
+      "package": "problems.knapsack",
+      "baseline": "solutions/workdir/knapsack_solution.py"
+    }
+  ]
+}
