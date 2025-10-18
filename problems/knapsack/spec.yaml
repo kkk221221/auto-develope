@@ -1,0 +1,7 @@
+id: knapsack
+objective: average optimal knapsack value
+metrics:
+  - accuracy
+  - runtime_ms
+  - robustness
+  - memory_peak_mb

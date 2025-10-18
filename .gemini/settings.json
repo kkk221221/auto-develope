@@ -1,0 +1,17 @@
+{
+  "//": "Default Gemini CLI settings for this repository. Mark the workspace as trusted and enable the shell tool for automated runs.",
+  "trust": "trusted",
+  "tools": {
+    "core": [
+      "run_shell_command",
+      "replace",
+      "write_file",
+      "read_file",
+      "search_file_content",
+      "web_fetch"
+    ],
+    "shell": {
+      "enableInteractiveShell": false
+    }
+  }
+}

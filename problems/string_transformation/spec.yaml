@@ -1,0 +1,9 @@
+name: string_transformation
+objectives:
+  accuracy: 1.0
+  runtime_ms: -1.0
+  robustness: 0.5
+dataset:
+  generator: data_gen.py
+  description: |
+    Transforms a string by reversing it and converting it to uppercase.
