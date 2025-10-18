@@ -5,6 +5,7 @@ import ast
 import importlib
 import importlib.util
 import multiprocessing
+from multiprocessing.connection import Connection
 import statistics
 import sys
 from dataclasses import dataclass
@@ -19,6 +20,35 @@ except ImportError:  # pragma: no cover - fallback for non-POSIX platforms
     resource = None  # type: ignore[assignment]
 
 from .models import BehaviorFeatures, EvaluationResult, Metrics, ProgramCandidate
+
+
+_BANNED_MODULES = {"os", "subprocess", "pathlib", "inspect"}
+_BANNED_CALLS = {
+    "eval",
+    "exec",
+    "__import__",
+    "open",
+    "compile",
+    "input",
+    "globals",
+    "locals",
+    "vars",
+    "getattr",
+    "setattr",
+    "delattr",
+}
+_BANNED_ATTRIBUTES = {
+    "__dict__",
+    "__class__",
+    "__globals__",
+    "__getattribute__",
+    "__subclasses__",
+    "__code__",
+    "__closure__",
+}
+_BANNED_NAMES = {"__builtins__", "__loader__", "__spec__"}
+_MAX_AST_NODES = 600
+_MAX_AST_DEPTH = 32
 
 
 @dataclass
@@ -38,7 +68,7 @@ def _sandbox_worker(
     source_path: str,
     samples: Sequence,
     memory_limit_bytes: int,
-    queue: multiprocessing.Queue,
+    conn: Connection,
 ) -> None:
     try:
         if memory_limit_bytes > 0 and resource is not None:
@@ -58,9 +88,14 @@ def _sandbox_worker(
             raise AttributeError("Candidate module must define solve()")
         solve = getattr(module, "solve")
         result = float(solve(samples))
-        queue.put(("ok", result))
+        conn.send(("ok", result))
     except Exception as exc:  # pragma: no cover - defensive fallback
-        queue.put(("error", f"{type(exc).__name__}: {exc}"))
+        try:
+            conn.send(("error", f"{type(exc).__name__}: {exc}"))
+        except Exception:  # pragma: no cover - defensive fallback
+            pass
+    finally:
+        conn.close()
 
 
 class ProblemEvaluator:
@@ -163,36 +198,34 @@ class ProblemEvaluator:
         dataset = list(samples)
         memory_bytes = int(self.memory_limit_mb * 1024 * 1024)
         ctx = multiprocessing.get_context("spawn")
-        queue: multiprocessing.Queue = ctx.Queue(maxsize=1)
+        parent_conn, child_conn = ctx.Pipe(duplex=False)
         process = ctx.Process(
             target=_sandbox_worker,
-            args=(source_path, dataset, memory_bytes, queue),
+            args=(source_path, dataset, memory_bytes, child_conn),
             daemon=True,
         )
         process.start()
-        process.join(self.execution_timeout_s)
-        if process.is_alive():
-            process.terminate()
+        if parent_conn.poll(self.execution_timeout_s):
+            try:
+                status, payload = parent_conn.recv()
+            finally:
+                parent_conn.close()
             process.join()
-            queue.close()
-            queue.join_thread()
-            raise TimeoutError(
-                f"Candidate execution exceeded {self.execution_timeout_s:.2f}s sandbox limit"
-            )
-        if not queue.empty():
-            status, payload = queue.get()
-            queue.close()
-            queue.join_thread()
             if status == "ok":
                 return float(payload)
             raise RuntimeError(f"Candidate execution failed: {payload}")
-        queue.close()
-        queue.join_thread()
-        if process.exitcode and process.exitcode != 0:
-            raise RuntimeError(
-                f"Candidate execution terminated with exit code {process.exitcode}"
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            parent_conn.close()
+            raise TimeoutError(
+                f"Candidate execution exceeded {self.execution_timeout_s:.2f}s sandbox limit"
             )
-        raise RuntimeError("Candidate execution produced no result")
+        exit_code = process.exitcode
+        parent_conn.close()
+        raise RuntimeError(
+            f"Candidate execution terminated unexpectedly with exit code {exit_code}"
+        )
 
     def _score_accuracy(self, candidate_score: float, reference_score: float) -> float:
         denom = max(abs(reference_score), 1.0)
@@ -353,15 +386,54 @@ class TierExecutor:
         return True
 
     async def _ast_rules(self, candidate: ProgramCandidate) -> bool:
-        banned = {"os", "subprocess"}
-        tree = ast.parse(Path(candidate.source_path).read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
+        source = Path(candidate.source_path).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        node_count = 0
+        max_depth = 0
+        stack: List[tuple[ast.AST, int]] = [(tree, 0)]
+        suspicious_strings = 0
+
+        while stack:
+            node, depth = stack.pop()
+            node_count += 1
+            max_depth = max(max_depth, depth)
+            if node_count > _MAX_AST_NODES or max_depth > _MAX_AST_DEPTH:
+                return False
+
+            if isinstance(node, (ast.Global, ast.Nonlocal)):
+                return False
+
             if isinstance(node, ast.Import):
-                if any(alias.name.split(".")[0] in banned for alias in node.names):
+                for alias in node.names:
+                    if alias.name.split(".")[0] in _BANNED_MODULES:
+                        return False
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and node.module.split(".")[0] in _BANNED_MODULES:
                     return False
-            if isinstance(node, ast.ImportFrom):
-                if node.module and node.module.split(".")[0] in banned:
+            elif isinstance(node, ast.Call):
+                func = node.func
+                call_name = None
+                if isinstance(func, ast.Name):
+                    call_name = func.id
+                elif isinstance(func, ast.Attribute):
+                    call_name = func.attr
+                if call_name and call_name in _BANNED_CALLS:
                     return False
+            elif isinstance(node, ast.Attribute):
+                if node.attr in _BANNED_ATTRIBUTES:
+                    return False
+            elif isinstance(node, ast.Name):
+                if node.id in _BANNED_NAMES:
+                    return False
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if any(marker in node.value for marker in _BANNED_CALLS | _BANNED_ATTRIBUTES | _BANNED_NAMES):
+                    suspicious_strings += 1
+                    if suspicious_strings > 2:
+                        return False
+
+            stack.extend((child, depth + 1) for child in ast.iter_child_nodes(node))
+
         return True
 
 
