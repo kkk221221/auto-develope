@@ -1,5 +1,5 @@
 """Self-evolving orchestrator package."""
-from .agents import GeminiAgentAdapter, GeminiAgentError
+from .agents import LLMApiAgentAdapter, LLMApiAgentError
 from .run_loop import EvolutionOrchestrator
 
-__all__ = ["EvolutionOrchestrator", "GeminiAgentAdapter", "GeminiAgentError"]
+__all__ = ["EvolutionOrchestrator", "LLMApiAgentAdapter", "LLMApiAgentError"]

@@ -11,7 +11,7 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Deque, Iterable, List, Mapping, Optional
 
-from .agents import GeminiAgentAdapter
+from .agents import LLMApiAgentAdapter
 from .behaviors import extract_behavior_features
 from .caching import CacheManager
 from .dashboard import render_map_elites_dashboard
@@ -334,10 +334,24 @@ async def demo_run() -> None:
     if focus_problem and focus_problem in problem_specs:
         ordered_ids = [focus_problem] + [pid for pid in problem_specs if pid != focus_problem]
         problem_specs = {pid: problem_specs[pid] for pid in ordered_ids}
-    agent: GeminiAgentAdapter | None = None
-    cli_command = os.getenv("GEMINI_CLI_COMMAND")
-    if cli_command:
-        agent = GeminiAgentAdapter(cli_command=cli_command.split())
+    agent: LLMApiAgentAdapter | None = None
+    model = os.getenv("LLM_API_MODEL")
+    api_key = os.getenv("LLM_API_KEY") or os.getenv("DASHSCOPE_API_KEY")
+    if model and api_key:
+        temperature_env = os.getenv("LLM_API_TEMPERATURE")
+        try:
+            temperature = float(temperature_env) if temperature_env is not None else None
+        except ValueError:
+            temperature = None
+        agent = LLMApiAgentAdapter(
+            model=model,
+            api_key=api_key,
+            base_url=os.getenv(
+                "LLM_API_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            ),
+            temperature=temperature,
+            system_prompt=os.getenv("LLM_API_SYSTEM_PROMPT"),
+        )
     lineage_tracker = GitLineageTracker(Path(".artifacts/git_lineage"))
     generator = ProgramGenerator(
         problem_specs=problem_specs,

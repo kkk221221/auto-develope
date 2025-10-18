@@ -12,7 +12,7 @@
    ```
    `dev` 额外安装 `pytest`、`ruff`、`mypy` 以支持 CI 与本地质量检查。
 3. **目录约定**：候选工作目录写入 `.artifacts/candidates/`，缓存目录默认为内存，可通过 `CacheManager(environment_fingerprint=..., backend=FilesystemCacheBackend(Path(".cache/evals")))` 持久化。
-4. **Gemini CLI 信任配置**：仓库根目录的 `.gemini/settings.json` 默认将当前工作空间标记为 `trusted` 并启用 `run_shell_command` 等核心工具，确保 CLI 在自动化环境中可执行测试/脚本。若需自定义权限，可根据项目安全策略调整该文件或运行 `gemini /permissions` 交互式修改。
+4. **LLM API 凭据管理**：将访问令牌保存在 CI/CD 密钥或本地 `.env` 文件中，运行前导出 `LLM_API_KEY`；如需细粒度审计，可结合密钥轮换服务或使用短期会话令牌。
 
 ## 2. 常见操作
 
@@ -99,12 +99,15 @@ python problems/knapsack/bench.py
 - 《docs/governance.md》：安全、合规、审计要求。
 - 《docs/observability.md》：指标、日志与可视化方案。
 
-> 💡 已安装并登录 `gemini-cli` 后，可通过环境变量启用真实 LLM 生成：
+> 💡 要启用真实 LLM 生成，可配置直连推理 API 的环境变量：
 > ```bash
-> export GEMINI_CLI_COMMAND='gemini --output-format json'
-> export GEMINI_RATE_LIMIT_RPM=45          # 可按配额调整
-> export GEMINI_RATE_LIMIT_CONCURRENCY=4   # 控制并发
-> export GEMINI_RATE_LIMIT_BURST=6         # 允许的瞬时突发
+> export LLM_API_MODEL='qwen3-max'
+> export DASHSCOPE_API_KEY='sk-...'
+> export LLM_API_BASE_URL='https://dashscope.aliyuncs.com/compatible-mode/v1'
+> export LLM_API_TEMPERATURE=0.7             # 可选，控制多样性
+> export LLM_API_RATE_LIMIT_RPM=60           # 可按配额调整
+> export LLM_API_RATE_LIMIT_CONCURRENCY=4    # 控制并发
+> export LLM_API_RATE_LIMIT_BURST=6          # 允许的瞬时突发
 > python -m orchestrator.run_loop
 > ```
-> Orchestrator 会自动实例化 `GeminiAgentAdapter`，根据上述限流参数为 CLI 调用套上令牌桶与指数退避，若解析失败则回退到内置模板变异。
+> Orchestrator 会自动实例化 `LLMApiAgentAdapter`，通过 OpenAI Python SDK 与流式响应消费 JSON patch；若 API 响应异常，则回退到内置模板变异。

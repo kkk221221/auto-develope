@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Mapping, Optional, Tuple, cast
 
-from .agents import AgentGeneration, GeminiAgentAdapter, GeminiAgentError
+from .agents import AgentGeneration, LLMApiAgentAdapter, LLMApiAgentError
 from .ast_crossover import perform_ast_crossover
 from .git_lineage import GitLineageError, GitLineageTracker
 from .models import BehaviorFeatures, ProgramCandidate
@@ -744,7 +744,7 @@ class ProgramGenerator:
 
     problem_specs: Mapping[str, ProblemSpec]
     output_root: Path
-    agent: Optional[GeminiAgentAdapter] = None
+    agent: Optional[LLMApiAgentAdapter] = None
     lineage_tracker: Optional[GitLineageTracker] = None
     _agent_enabled: bool = field(init=False, default=True)
 
@@ -879,7 +879,7 @@ class ProgramGenerator:
                     Dict[str, object],
                     {
                         "arm": arm_key,
-                        "strategy": "gemini_cli",
+                        "strategy": "llm_api",
                         "telemetry": list(agent_result.telemetry_tags),
                         **dict(agent_result.metadata),
                         "problem_id": problem_id,
@@ -887,8 +887,8 @@ class ProgramGenerator:
                     },
                 )
                 return snippet, metadata
-            except GeminiAgentError as error:
-                LOGGER.warning("Gemini CLI fallback for %s: %s", problem_id, error)
+            except LLMApiAgentError as error:
+                LOGGER.warning("LLM API fallback for %s: %s", problem_id, error)
                 self._agent_enabled = False
         if intent == "repair":
             snippet = _repair_snippet(problem_id, failure_context)

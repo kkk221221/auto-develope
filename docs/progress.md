@@ -12,12 +12,12 @@
 ## 0. 当前完成度快照
 
 - **整体完成度估算**：约 75% —— 管线运行、档案/选择、跨问题演化与持久化快照均已落地；仍需交付分布式评测、交互式观测面板与提示反馈闭环。
-- **核心能力**：候选生成（含 AST 交叉、Gemini CLI 适配、自动 repair）、评测级联（L0→L3）、档案选择（NSGA-II、MAP-Elites、新颖度）、缓存与快照、Git 谱系追踪已全部上线并通过端到端示例验证。
+- **核心能力**：候选生成（含 AST 交叉、LLM API 适配、自动 repair）、评测级联（L0→L3）、档案选择（NSGA-II、MAP-Elites、新颖度）、缓存与快照、Git 谱系追踪已全部上线并通过端到端示例验证。
 - **剩余重点**：观测面板升级、容器化评测、提示反馈强化、多问题规模化回归、治理审计工具链。
 
 ## 1. 愿景回顾
 
-- **目标**：以 `google-gemini/gemini-cli` 为核心执行器，落地 AlphaEvolve 风格的自进化算法系统，覆盖提示演化、候选生成、评测级联、品质多样性档案、谱系治理与运维观测。
+- **目标**：以可直连的 LLM 推理 API 为核心执行器，落地 AlphaEvolve 风格的自进化算法系统，覆盖提示演化、候选生成、评测级联、品质多样性档案、谱系治理与运维观测。
 - **原则**：吞吐优先、可复现、安全隔离、可回放、品质多样性、提示共进化。
 
 ## 2. 里程碑完成度
@@ -37,9 +37,9 @@
 - **计划**：实现数据库/Object Storage 版本的 `PersistenceGateway`；暴露 `run replay` CLI 用于失败分析；引入 OpenTelemetry/OpenMetrics 埋点形成 run 级追踪。
 
 ### 3.2 候选生成与谱系
-- **现状**：`ProgramGenerator` 根据 `configs/problems.json` 自动载入基线，生成 mutate / repair / crossover 候选；`GeminiAgentAdapter` 对接 CLI 并透传 telemetry；AST 交叉会生成结构化 `plan` 元数据；`GitLineageTracker` 将源码与补丁提交至问题分支。
-- **缺口**：交叉冲突仅以文本记录在 metadata，缺乏差异可视化与降级方案；谱系仓库只存在本地，未接入签名/远端推送策略；LLM 路由与速率控制未实现。
-- **计划**：生成结构化交叉报告，纳入档案/仪表盘；扩展 `GeminiAgentAdapter` 支持多后端与退避重试；将谱系推送至受控远端仓库并附加审计标签。
+- **现状**：`ProgramGenerator` 根据 `configs/problems.json` 自动载入基线，生成 mutate / repair / crossover 候选；`LLMApiAgentAdapter` 通过 OpenAI SDK 拉取流式补丁并透传 telemetry；AST 交叉会生成结构化 `plan` 元数据；`GitLineageTracker` 将源码与补丁提交至问题分支。
+- **缺口**：交叉冲突仅以文本记录在 metadata，缺乏差异可视化与降级方案；谱系仓库只存在本地，未接入签名/远端推送策略；LLM 路由策略仍待与多模型权重联动。
+- **计划**：生成结构化交叉报告，纳入档案/仪表盘；扩展 `LLMApiAgentAdapter` 支持多后端与退避重试；将谱系推送至受控远端仓库并附加审计标签。
 
 ### 3.3 评测级联与调度
 - **现状**：`ProblemEvaluator` 运行多次样本、对抗/噪声集并计算分位数；`TierExecutor` 通过 lint/typecheck/AST 规则前置筛查，支持超时/圈复杂度/运行时门限；`bench.py` 脚本验证压力路径。
@@ -53,8 +53,8 @@
 
 ### 3.5 提示策略与模板
 - **现状**：`PromptBandit` 使用 Thompson Sampling 对提示臂打分，`PromptGenome` 根据奖励调整温度、指令顺序与 checklist；`agents/prompts/` 覆盖 sample、shortest_path、knapsack 的 mutate/repair 臂，并在失败时自动追加 `Investigate <tier>_fail`。
-- **缺口**：提示遥测仅以 JSON 导出，未形成分析面板；实际运行需手动配置 `GEMINI_CLI_COMMAND`，缺失速率控制与模型切换；repair 模板依赖规则生成，缺乏数据驱动反馈。
-- **计划**：搭建 Prompt 遥测仪表盘与警报机制；为 CLI 调用增加熔断与退避策略；构建失败案例库驱动 repair 模板进化。
+- **缺口**：提示遥测仅以 JSON 导出，未形成分析面板；实际运行需手动配置 `LLM_API_ENDPOINT`/`LLM_API_MODEL`，缺乏多模型加权与自适应参数；repair 模板依赖规则生成，缺乏数据驱动反馈。
+- **计划**：搭建 Prompt 遥测仪表盘与警报机制；为 API 调用增加熔断与退避策略；构建失败案例库驱动 repair 模板进化。
 
 ### 3.6 问题资产与配置
 - **现状**：`configs/problems.json` 对接 `solutions/workdir/*.py` 基线，`problems/*` 目录提供数据生成、oracle、测试用例；`configs/tiers.yaml`、`configs/scheduler.yaml`、`configs/bandit.yaml` 定义评测与调度参数；Dockerfile 支持容器化运行。
@@ -71,7 +71,7 @@
 
 | 风险 | 影响 | 应对策略 |
 | --- | --- | --- |
-| LLM 输出结构不稳定或 CLI 超时 | 评测失败、补丁损坏、吞吐下降 | 强化 JSON Schema 校验，加入 CLI 退避/重试与熔断，保留 repair 模板回退路径 |
+| LLM 输出结构不稳定或 API 超时 | 评测失败、补丁损坏、吞吐下降 | 强化 JSON Schema 校验，加入 API 退避/重试与熔断，保留 repair 模板回退路径 |
 | 评测成本过高 | 吞吐下降、预算超限 | Successive Halving + 缓存复用；引入容器 quota 与成本监控；定期对样例集降采样校准 |
 | 档案早收敛 | 多样性降低，探索不足 | 提升新颖度权重、周期性注入随机变异、扩展岛屿迁徙策略 |
 | 安全/合规缺口 | 数据泄露或执行中断 | 保持评测沙箱、AST 白名单、依赖许可证扫描；扩充 `docs/governance.md` 的审计流程并落地日志管道 |
