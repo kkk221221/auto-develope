@@ -5,7 +5,7 @@ import logging
 import re
 import textwrap
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Mapping, Optional, Tuple, cast
 
@@ -746,6 +746,7 @@ class ProgramGenerator:
     output_root: Path
     agent: Optional[GeminiAgentAdapter] = None
     lineage_tracker: Optional[GitLineageTracker] = None
+    _agent_enabled: bool = field(init=False, default=True)
 
     def __post_init__(self) -> None:
         if not self.problem_specs:
@@ -758,6 +759,7 @@ class ProgramGenerator:
             self.baseline_blocks[problem_id] = _extract_evolve_block(source)
         self.default_problem = next(iter(self.problem_specs))
         self.output_root.mkdir(parents=True, exist_ok=True)
+        self._agent_enabled = self.agent is not None
 
     def spawn_candidate(
         self,
@@ -869,7 +871,7 @@ class ProgramGenerator:
         prompt_to_use = prompt
         if failure_context:
             prompt_to_use = prompt.with_context(failure_context)
-        if self.agent:
+        if self.agent and self._agent_enabled:
             try:
                 agent_result: AgentGeneration = self.agent.generate(prompt_to_use)
                 snippet = agent_result.snippet
@@ -887,6 +889,7 @@ class ProgramGenerator:
                 return snippet, metadata
             except GeminiAgentError as error:
                 LOGGER.warning("Gemini CLI fallback for %s: %s", problem_id, error)
+                self._agent_enabled = False
         if intent == "repair":
             snippet = _repair_snippet(problem_id, failure_context)
             metadata = cast(

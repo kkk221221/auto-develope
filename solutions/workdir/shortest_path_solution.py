@@ -20,21 +20,36 @@ def solve(samples: Iterable[Dict[str, object]]) -> float:
 
 
 def _dijkstra(sample: Dict[str, object]) -> float:
-    nodes = int(sample.get("nodes", 0))
+    if "nodes" not in sample:
+        raise ValueError("Missing 'nodes' in sample")
+    nodes = int(sample["nodes"])
+    if "source" not in sample:
+        raise ValueError("Missing 'source' in sample")
+    source = int(sample["source"])
+    if "target" not in sample:
+        raise ValueError("Missing 'target' in sample")
+    target = int(sample["target"])
+    if not 0 <= source < nodes:
+        raise ValueError(f"Source node {source} is out of bounds")
+    if not 0 <= target < nodes:
+        raise ValueError(f"Target node {target} is out of bounds")
     edges = sample.get("edges", [])
-    source = int(sample.get("source", 0))
-    target = int(sample.get("target", nodes - 1))
     adjacency: List[List[Tuple[int, float]]] = [[] for _ in range(nodes)]
     for edge in edges:
+        if not isinstance(edge, (list, tuple)) or len(edge) != 3:
+            raise ValueError(f"Malformed edge: {edge!r}")
+        u, v, w = edge
         try:
-            u, v, w = edge
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(u, int) or not isinstance(v, int):
             u, v = int(u), int(v)
-        weight = float(w) if isinstance(w, (int, float)) else 1.0
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid node identifiers: {u!r}, {v!r}") from e
+        if not isinstance(w, (int, float)):
+            raise ValueError(f"Invalid weight: {w!r}")
+        weight = float(w)
+        if weight < 0:
+            raise ValueError(f"Negative weight: {w!r}")
         if 0 <= u < nodes and 0 <= v < nodes:
-            adjacency[u].append((v, max(weight, 0.0)))
+            adjacency[u].append((v, weight))
     return _dijkstra_from_adj(adjacency, source, target)
 
 
@@ -53,7 +68,9 @@ def _dijkstra_from_adj(graph: Sequence[Sequence[Tuple[int, float]]], source: int
             if candidate < distances[neighbour]:
                 distances[neighbour] = candidate
                 heapq.heappush(queue, (candidate, neighbour))
-    return float("inf")
+    if distances[target] == float("inf"):
+        raise ValueError(f"Target not reachable from source")
+    return distances[target]
 
 
 # EVOLVE-BLOCK-END

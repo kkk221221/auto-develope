@@ -12,6 +12,7 @@
    ```
    `dev` 额外安装 `pytest`、`ruff`、`mypy` 以支持 CI 与本地质量检查。
 3. **目录约定**：候选工作目录写入 `.artifacts/candidates/`，缓存目录默认为内存，可通过 `CacheManager(environment_fingerprint=..., backend=FilesystemCacheBackend(Path(".cache/evals")))` 持久化。
+4. **Gemini CLI 信任配置**：仓库根目录的 `.gemini/settings.json` 默认将当前工作空间标记为 `trusted` 并启用 `run_shell_command` 等核心工具，确保 CLI 在自动化环境中可执行测试/脚本。若需自定义权限，可根据项目安全策略调整该文件或运行 `gemini /permissions` 交互式修改。
 
 ## 2. 常见操作
 
@@ -98,5 +99,12 @@ python problems/knapsack/bench.py
 - 《docs/governance.md》：安全、合规、审计要求。
 - 《docs/observability.md》：指标、日志与可视化方案。
 
-> 💡 若已安装并登录 `gemini-cli`，可通过环境变量 `GEMINI_CLI_COMMAND="gemini prompt --output json"` 启用真实 LLM 生成。Orchestrator 会自动实例化 `GeminiAgentAdapter`，将 `PromptBandit` 渲染的提示文本发送给 CLI，并在解析失败时回退到内置模板变异。
-
+> 💡 已安装并登录 `gemini-cli` 后，可通过环境变量启用真实 LLM 生成：
+> ```bash
+> export GEMINI_CLI_COMMAND='gemini --output-format json'
+> export GEMINI_RATE_LIMIT_RPM=45          # 可按配额调整
+> export GEMINI_RATE_LIMIT_CONCURRENCY=4   # 控制并发
+> export GEMINI_RATE_LIMIT_BURST=6         # 允许的瞬时突发
+> python -m orchestrator.run_loop
+> ```
+> Orchestrator 会自动实例化 `GeminiAgentAdapter`，根据上述限流参数为 CLI 调用套上令牌桶与指数退避，若解析失败则回退到内置模板变异。

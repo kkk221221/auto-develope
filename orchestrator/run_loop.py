@@ -132,6 +132,13 @@ class EvolutionOrchestrator:
         self.selection_strategy.observe_candidate(candidate)
         reward = self._score_prompt_reward(candidate.metrics)
         self.prompt_bandit.update_reward(candidate.prompt_arm, reward)
+        LOGGER.info(
+            "Arm %s produced candidate %s with reward %.3f and metrics %s",
+            candidate.prompt_arm,
+            candidate.id,
+            reward,
+            candidate.metrics,
+        )
         if self.prompt_telemetry_path:
             try:
                 self.prompt_bandit.export_telemetry(self.prompt_telemetry_path)
@@ -145,8 +152,10 @@ class EvolutionOrchestrator:
         return candidate
 
     def _sample_and_generate(self) -> ProgramCandidate:
-        problem_id = self._next_problem_id()
-        arm_name, prompt = self.prompt_bandit.pick_prompt(intent="mutate", problem_id=problem_id)
+        problem_id = "knapsack"
+        arm_name, prompt = self.prompt_bandit.pick_prompt(
+            intent="mutate", problem_id=problem_id, prefer_island="robustness"
+        )
         candidate = self.program_generator.spawn_candidate(arm_name, prompt, problem_id=problem_id)
         LOGGER.debug(
             "Generating new candidate %s with arm %s for problem %s",
