@@ -2,21 +2,30 @@
 from __future__ import annotations
 
 import json
-from time import perf_counter
+from pathlib import Path
 
-from .data_gen import generate_samples
-from .oracle import evaluate_solution
+from orchestrator.evaluation import ProblemEvaluator
+from orchestrator.models import ProgramCandidate
 
 
-def run_benchmark() -> None:
-    samples = generate_samples()
-    start = perf_counter()
-    score = evaluate_solution(samples)
-    duration_ms = (perf_counter() - start) * 1000
+def run_benchmark(candidate_path: str | None = None) -> None:
+    source = Path(candidate_path or "solutions/workdir/sample_solution.py").resolve()
+    candidate = ProgramCandidate(
+        id="benchmark",
+        parents=tuple(),
+        generation=0,
+        prompt_arm="benchmark",
+        llm_backend="flash",
+        patch_payload={},
+        source_path=str(source),
+    )
+    evaluator = ProblemEvaluator("problems.sample_problem")
+    metrics = evaluator.evaluate(candidate, dataset_size=32, repeats=3, stress=True)
     result = {
-        "score": score,
-        "runtime_ms": duration_ms,
-        "samples": len(samples),
+        "accuracy": metrics.accuracy,
+        "runtime_ms": metrics.runtime_ms,
+        "memory_peak_mb": metrics.memory_peak_mb,
+        "robustness": metrics.robustness,
     }
     print(json.dumps(result))
 

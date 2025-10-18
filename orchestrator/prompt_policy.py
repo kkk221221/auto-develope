@@ -1,11 +1,10 @@
 """Prompt bandit policy and prompt metadata utilities."""
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
-
-import yaml
 
 from .models import PromptArm
 
@@ -44,7 +43,7 @@ class PromptBandit:
 
     def pick_prompt(self) -> Tuple[str, PromptTemplate]:
         scored = {
-            name: arm.successes / (arm.successes + arm.failures)
+            name: random.betavariate(arm.successes, arm.failures)
             for name, arm in self.arms.items()
         }
         chosen_name = max(scored, key=scored.get)
@@ -57,11 +56,3 @@ class PromptBandit:
         else:
             arm.failures += 1.0
         arm.recent_reward = reward
-
-
-def load_prompt_metadata(path: Path) -> Dict[str, str]:
-    if not path.exists():
-        return {}
-    with open(path, "r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle) or {}
-

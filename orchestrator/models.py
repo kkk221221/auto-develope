@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -48,11 +48,13 @@ class ProgramCandidate:
     prompt_arm: str
     llm_backend: str
     patch_payload: Dict[str, str]
+    problem_id: str = "sample_problem"
+    source_path: str = ""
     metrics: Metrics = field(default_factory=Metrics)
     behavior: BehaviorFeatures = field(default_factory=BehaviorFeatures)
     eval_passes: List[str] = field(default_factory=list)
     status: EvalStatus = EvalStatus.PENDING
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     evaluated_at: Optional[datetime] = None
     novelty_score: float = 0.0
 
@@ -79,7 +81,7 @@ class EvaluationResult:
     metrics: Metrics
     behavior: Optional[BehaviorFeatures] = None
     logs_path: Optional[str] = None
-    completed_at: datetime = field(default_factory=datetime.utcnow)
+    completed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass(slots=True)
@@ -108,5 +110,5 @@ class CacheEntry:
     cache_key: str
     tier: str
     metrics: Metrics
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 

@@ -4,13 +4,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-import uuid
 from collections import deque
 from dataclasses import asdict, replace
 from typing import Deque, Iterable, List, Optional
 
+from pathlib import Path
+
 from .behaviors import extract_behavior_features
 from .caching import CacheManager
+from .evaluation import ProblemEvaluator, TierExecutor, load_tier_specs
+from .generation import ProgramGenerator
 from .models import ArchiveState, EvalStatus, EvaluationResult, ProgramCandidate, SchedulerConfig
 from .prompt_policy import PromptBandit
 from .scheduler import EvaluationScheduler
@@ -29,12 +32,17 @@ class EvolutionOrchestrator:
         selection_strategy: SelectionStrategy,
         archive_manager: ArchiveManager,
         cache_manager: CacheManager,
+        program_generator: ProgramGenerator,
     ) -> None:
-        self.scheduler = EvaluationScheduler(config=scheduler_config)
+        tier_specs = load_tier_specs(Path("configs/tiers.yaml"))
+        evaluator = ProblemEvaluator("problems.sample_problem")
+        tier_executor = TierExecutor(tier_specs=tier_specs, evaluator=evaluator)
+        self.scheduler = EvaluationScheduler(config=scheduler_config, tier_executor=tier_executor)
         self.prompt_bandit = prompt_bandit
         self.selection_strategy = selection_strategy
         self.archive_manager = archive_manager
         self.cache_manager = cache_manager
+        self.program_generator = program_generator
         self.pending_candidates: Deque[ProgramCandidate] = deque()
 
     def queue_initial_population(self, seeds: Iterable[ProgramCandidate]) -> None:
@@ -89,17 +97,8 @@ class EvolutionOrchestrator:
 
     def _sample_and_generate(self) -> ProgramCandidate:
         arm_name, prompt = self.prompt_bandit.pick_prompt()
-        candidate_id = str(uuid.uuid4())
-        LOGGER.debug("Generating new candidate %s with arm %s", candidate_id, arm_name)
-        # Placeholder for actual LLM generation; we simulate metrics.
-        candidate = ProgramCandidate(
-            id=candidate_id,
-            parents=tuple(),
-            generation=0,
-            prompt_arm=arm_name,
-            llm_backend=prompt.backend,
-            patch_payload={"diff_type": "sr", "payload": ""},
-        )
+        candidate = self.program_generator.spawn_candidate(arm_name, prompt.backend)
+        LOGGER.debug("Generating new candidate %s with arm %s", candidate.id, arm_name)
         return candidate
 
     def _apply_result(
@@ -151,6 +150,8 @@ async def demo_run() -> None:
     selection = SelectionStrategy(population_size=4, default_prompt_arm=default_arm)
     archive_manager = ArchiveManager(ArchiveState())
     cache_manager = CacheManager()
+    baseline_path = Path("solutions/workdir/sample_solution.py")
+    generator = ProgramGenerator(baseline_path=baseline_path, output_root=Path(".artifacts/candidates"))
 
     orchestrator = EvolutionOrchestrator(
         scheduler_config=scheduler_config,
@@ -158,9 +159,10 @@ async def demo_run() -> None:
         selection_strategy=selection,
         archive_manager=archive_manager,
         cache_manager=cache_manager,
+        program_generator=generator,
     )
 
-    orchestrator.queue_initial_population(selection.bootstrap_population())
+    orchestrator.queue_initial_population(selection.bootstrap_population(generator))
     await orchestrator.run(max_steps=5)
 
 
