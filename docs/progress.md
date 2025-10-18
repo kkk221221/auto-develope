@@ -27,12 +27,12 @@
   3. 对接指标日志（OpenTelemetry/OpenMetrics），实现 `run_id` 级追踪。
 
 ### 3.2 候选生成与谱系
-- **现状**：`generation.py` 内的 `ProgramGenerator` 支持基于 EVOLVE-BLOCK 的多样随机生成，跟踪父代与提示臂；新增 `GeminiAgentAdapter` 可直接调用已登录的 `gemini-cli` 并在失败时回退模板。
-- **缺口**：交叉与修复策略尚未纳入；谱系信息未写回 Git；CLI 仍需接入远程存储与错误分级重试。
+- **现状**：`generation.py` 内的 `ProgramGenerator` 支持基于 EVOLVE-BLOCK 的多样随机生成，跟踪父代与提示臂；`GeminiAgentAdapter` 可直接调用已登录的 `gemini-cli` 并在失败时回退模板；`perform_ast_crossover` 现已集成，允许在 `SelectionStrategy` 中以概率方式触发双亲融合。
+- **缺口**：交叉结果尚未输出冲突分级或补丁清洁度报告，缺少自动化 `repair` 模板；谱系信息仍未同步至 Git/远程存储，CLI 错误恢复仅支持一次模板回退。
 - **计划**：
-  1. 扩展 `GeminiAgentAdapter` 接入提示上下文的失败日志摘要，并支持多模型路由。
-  2. 集成 `ast_crossover.py` 与 `repair` 流程，实现交叉或失败修复的候选注入。
-  3. 与 `solutions/workdir/` 建立 Git 分支或工作树写入，记录 `patch.diff` 与谱系元数据。
+  1. 扩展 `GeminiAgentAdapter` 接入提示上下文的失败日志摘要，并支持多模型路由与限流重试。
+  2. 为交叉与失败候选引入 `repair`/微补丁流水线，并记录冲突、撤销与评分结果。
+  3. 与 `solutions/workdir/` 建立 Git 分支或工作树写入，补充 `patch.diff`、谱系与遥测元数据，支撑回放与审计。
 
 ### 3.3 评测级联与调度
 - **现状**：`ProblemEvaluator.evaluate` 支持 L3 压测、对抗/噪声数据、运行时分位数；`TierExecutor` 依据 `TierSpec.max_cyclomatic/max_runtime_ms` 判定通过，`bench.py` 可在压力模式下输出 JSON。
@@ -43,12 +43,12 @@
   3. 在多问题集上回归评测，以验证压力样例的泛化效果。
 
 ### 3.4 档案、选择与品质多样性
-- **现状**：评测行为特征已由 `ProblemEvaluator` 填充运行时分位数与覆盖度；`selection.py` 引入 AST 交叉与失败回退，MAP-Elites 继续更新。
-- **缺口**：MAP-Elites 快照与岛屿迁徙仍未实现；需要生成可视化报表。
+- **现状**：评测行为特征已由 `ProblemEvaluator` 填充运行时分位数与覆盖度；`ArchiveManager` 计算新颖度并维护 MAP-Elites 网格；`SelectionStrategy` 利用拥挤距离、新颖度退火与 35% 交叉概率挑选后代，同时将种群写入快照供重启恢复。
+- **缺口**：MAP-Elites 快照虽已可落盘，但仍缺少岛屿迁徙策略与可视化导出；交叉暂未生成冲突报告或自动修复补丁，无法评估融合质量。
 - **计划**：
   1. 将档案快照导出为 CSV/JSON，并在 `docs/observability.md` 提到的面板中展示。
-  2. 实装岛屿迁徙策略，结合失败标签调度移民。
-  3. 为交叉流程添加冲突降级与谱系可视化。
+  2. 实装岛屿迁徙策略，结合失败标签调度移民，并针对 MAP-Elites 稀疏格实施重点采样。
+  3. 为交叉流程添加冲突降级、补丁评分与谱系可视化输出。
 
 ### 3.5 缓存与可复现
 - **现状**：`CacheManager` 支持环境指纹、命中率统计与 `FilesystemCacheBackend` 持久化；`CacheEntry` 可序列化 JSON。
@@ -125,5 +125,8 @@
 - [x] `caching.py`：支持外部缓存后端与命中率指标。
 - [x] `docs/`：补充运行手册、治理策略、观测面板草图。
 - [x] `.github/workflows/evolve.yml`：并发矩阵、artifact 上传、静态检查。
+- [ ] `generation.py`：接入自动化 `repair` 模板、交叉冲突分级与 CLI 重试节流策略。
+- [ ] `selection.py`：输出岛屿迁徙与 MAP-Elites 可视化数据工件。
+- [ ] `problems/`：新增性能/鲁棒双目标问题包并在 CI 中演示多问题矩阵。
 
 > 随着功能推进，此文档将持续更新，确保每个里程碑的工作量、依赖关系与风险透明可跟踪。

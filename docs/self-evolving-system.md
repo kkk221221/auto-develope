@@ -61,6 +61,16 @@
 - **评测池**：对新程序并行运行评估级联与基准。
 - **分布式控制器循环**：异步推进 sample→generate→validate→apply→evaluate→select。
 
+### 1.4 当前实现映射（2024Q4 仓库快照）
+
+- **编排循环与持久化**：`EvolutionOrchestrator` 负责装载级联配置、调度 `EvaluationScheduler`、处理缓存命中并将档案/种群/提示臂快照写入 `RunState`；若存在历史快照会在启动时自动恢复待评估队列与缓存统计。【F:orchestrator/run_loop.py†L35-L188】【F:orchestrator/persistence.py†L13-L108】
+- **候选生成与 Gemini 集成**：`ProgramGenerator` 根据提示臂渲染 EVOLVE 区块；若配置了 `GeminiAgentAdapter` 则优先消费 CLI 的 SEARCH/REPLACE 片段并保留遥测元数据，失败时退回内置模板变异；同一组件也提供 AST 引导的双亲交叉能力。【F:orchestrator/generation.py†L106-L210】【F:orchestrator/agents.py†L28-L124】
+- **提示老虎机与元提示**：`PromptBandit` 从模板目录解析臂配置，使用 Thompson Sampling 采样，并在奖励或失败反馈到来时更新温度、指令顺序与 checklist，以形成轻量元提示进化闭环。【F:orchestrator/prompt_policy.py†L13-L223】
+- **评测级联与行为特征**：`ProblemEvaluator` 在 `TierExecutor` 驱动下执行 L0→L3 检查，输出稳健统计、对抗套件评分、行为特征（覆盖哈希、运行时分位数）；配置由 `configs/tiers.yaml` 加载。【F:orchestrator/evaluation.py†L18-L240】
+- **档案与选择策略**：`ArchiveManager` 维护 NSGA-II Pareto 前沿、新颖度评分与 MAP-Elites 网格；`SelectionStrategy` 结合交叉概率、拥挤距离与新颖度权重挑选下一代或触发 AST 交叉。【F:orchestrator/selection.py†L106-L386】
+- **评测缓存**：`CacheManager` 基于环境指纹、补丁 payload 与源文件内容构建哈希键，支持内存或文件系统后端并统计命中率，既能复用评测结果也能通过快照恢复命中状态。【F:orchestrator/caching.py†L1-L205】
+- **基准与问题资产**：`problems/sample_problem` 提供数据生成、对抗样本与 `bench.py` JSON 基准脚本，支持在压力模式下验证评测路径。【F:problems/sample_problem/bench.py†L1-L41】
+
 ---
 
 ## 2. 数据与接口（Schemas & APIs）
