@@ -1,0 +1,9 @@
+name: sample_problem
+objectives:
+  accuracy: 1.0
+  runtime_ms: -1.0
+  robustness: 0.5
+dataset:
+  generator: data_gen.py
+  description: |
+    Synthetic dataset used for demonstrating the evolution pipeline.
