@@ -63,13 +63,14 @@
 
 ### 1.4 当前实现映射（2024Q4 仓库快照）
 
-- **编排循环与持久化**：`EvolutionOrchestrator` 负责装载级联配置、调度 `EvaluationScheduler`、处理缓存命中并将档案/种群/提示臂快照写入 `RunState`；若存在历史快照会在启动时自动恢复待评估队列与缓存统计。【F:orchestrator/run_loop.py†L35-L188】【F:orchestrator/persistence.py†L13-L108】
-- **候选生成与 Gemini 集成**：`ProgramGenerator` 根据提示臂渲染 EVOLVE 区块；若配置了 `GeminiAgentAdapter` 则优先消费 CLI 的 SEARCH/REPLACE 片段并保留遥测元数据，失败时退回内置模板变异；同一组件也提供 AST 引导的双亲交叉能力。【F:orchestrator/generation.py†L106-L210】【F:orchestrator/agents.py†L28-L124】
-- **提示老虎机与元提示**：`PromptBandit` 从模板目录解析臂配置，使用 Thompson Sampling 采样，并在奖励或失败反馈到来时更新温度、指令顺序与 checklist，以形成轻量元提示进化闭环。【F:orchestrator/prompt_policy.py†L13-L223】
-- **评测级联与行为特征**：`ProblemEvaluator` 在 `TierExecutor` 驱动下执行 L0→L3 检查，输出稳健统计、对抗套件评分、行为特征（覆盖哈希、运行时分位数）；配置由 `configs/tiers.yaml` 加载。【F:orchestrator/evaluation.py†L18-L240】
-- **档案与选择策略**：`ArchiveManager` 维护 NSGA-II Pareto 前沿、新颖度评分与 MAP-Elites 网格；`SelectionStrategy` 结合交叉概率、拥挤距离与新颖度权重挑选下一代或触发 AST 交叉。【F:orchestrator/selection.py†L106-L386】
+- **编排循环与持久化**：`EvolutionOrchestrator` 负责装载多问题配置、调度 `EvaluationScheduler`、处理缓存命中并将档案/种群/提示臂快照写入 `RunState`；若存在历史快照会在启动时自动恢复待评估队列与缓存统计，同时按环境变量可重排问题岛序。【F:orchestrator/run_loop.py†L35-L236】【F:orchestrator/persistence.py†L13-L108】
+- **候选生成与 Gemini 集成**：`ProgramGenerator` 读取 `configs/problems.json`，按 `problem_id` 渲染 EVOLVE 区块并在修复路径中注入失败上下文；若配置 `GeminiAgentAdapter` 则优先消费 CLI 的 SEARCH/REPLACE 片段，失败时退回内置多问题模板，另提供 AST 引导的同域交叉并输出冲突列表。【F:orchestrator/generation.py†L106-L356】【F:orchestrator/agents.py†L28-L124】
+- **谱系存档**：`GitLineageTracker` 在 `.artifacts/git_lineage/` 初始化 Git 仓库，记录候选源码与补丁元数据并写入 `ProgramCandidate.lineage_commit`，支持后续审计与回放。【F:orchestrator/git_lineage.py†L1-L123】
+- **提示老虎机与元提示**：`PromptBandit` 从模板目录解析臂配置、意图与所属岛屿，使用 Thompson Sampling 采样，并在奖励/失败反馈到来时更新温度、指令顺序与 checklist，现已支持 `repair` 臂、问题定向抽样，并导出 `.artifacts/prompt_telemetry.json`。【F:orchestrator/prompt_policy.py†L13-L303】
+- **评测级联与行为特征**：`ProblemEvaluator` 在 `TierExecutor` 驱动下针对 `problem_id` 选择对应数据生成与 oracle，执行 L0→L3 检查并输出稳健统计、对抗套件评分、行为特征；配置由 `configs/tiers.yaml` 加载。【F:orchestrator/evaluation.py†L18-L255】
+- **档案与选择策略**：`ArchiveManager` 维护 NSGA-II 前沿、新颖度评分与 MAP-Elites 网格，并在每次更新后落盘 JSON 快照与 `.artifacts/dashboard.html` 热力图；`SelectionStrategy` 结合交叉概率、拥挤距离、新颖度权重与岛屿迁徙挑选下一代，支持按问题域约束交叉并记录冲突摘要。【F:orchestrator/selection.py†L180-L386】【F:orchestrator/dashboard.py†L1-L104】
 - **评测缓存**：`CacheManager` 基于环境指纹、补丁 payload 与源文件内容构建哈希键，支持内存或文件系统后端并统计命中率，既能复用评测结果也能通过快照恢复命中状态。【F:orchestrator/caching.py†L1-L205】
-- **基准与问题资产**：`problems/sample_problem` 提供数据生成、对抗样本与 `bench.py` JSON 基准脚本，支持在压力模式下验证评测路径。【F:problems/sample_problem/bench.py†L1-L41】
+- **基准与问题资产**：`problems/sample_problem`、`problems/shortest_path`、`problems/knapsack` 均提供数据生成、对抗样本与 `bench.py` JSON 基准脚本，覆盖性能与鲁棒目标。【F:problems/sample_problem/bench.py†L1-L41】【F:problems/shortest_path/bench.py†L1-L36】【F:problems/knapsack/bench.py†L1-L36】
 
 ---
 
@@ -86,6 +87,7 @@ program:
   patch: {format: "unified|sr", payload: "..."}   # 统一diff或SEARCH/REPLACE
   prompt_arm: str                # 产出该候选的提示“臂”
   llm_backend: {flash|pro|...}
+  lineage_commit: str            # GitLineageTracker 回填的谱系提交
   features:                      # 行为/结构特征φ（用于新颖度与MAP-Elites）
     coverage_bits: bitset
     hotspots: {fn: time_ratio}

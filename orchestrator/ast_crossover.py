@@ -6,9 +6,9 @@ import copy
 import difflib
 import re
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from .models import BehaviorFeatures, ProgramCandidate
 
@@ -26,6 +26,7 @@ class CrossoverPlan:
     strategy: str
     description: str
     fragments: int
+    conflicts: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -57,9 +58,13 @@ def _apply_block(base_source: str, new_block: str) -> str:
     return f"{start}{prefix}{block}\n{suffix}{end}"
 
 
-def _merge_functions(functions_a: Dict[str, ast.FunctionDef], functions_b: Dict[str, ast.FunctionDef]) -> Tuple[List[ast.stmt], List[str]]:
+def _merge_functions(
+    functions_a: Dict[str, ast.FunctionDef],
+    functions_b: Dict[str, ast.FunctionDef],
+) -> Tuple[List[ast.stmt], List[str], List[str]]:
     merged: List[ast.stmt] = []
     notes: List[str] = []
+    conflicts: List[str] = []
     for name in sorted(set(functions_a) | set(functions_b)):
         func_a = functions_a.get(name)
         func_b = functions_b.get(name)
@@ -67,13 +72,14 @@ def _merge_functions(functions_a: Dict[str, ast.FunctionDef], functions_b: Dict[
             merged_func, note = _blend_function(func_a, func_b)
             merged.append(merged_func)
             notes.append(note)
+            conflicts.extend(_detect_conflicts(name, func_a, func_b))
         elif func_a:
             merged.append(copy.deepcopy(func_a))
             notes.append(f"Inherited {name} from parent A")
         elif func_b:
             merged.append(copy.deepcopy(func_b))
             notes.append(f"Inherited {name} from parent B")
-    return merged, notes
+    return merged, notes, conflicts
 
 
 def _blend_function(func_a: ast.FunctionDef, func_b: ast.FunctionDef) -> Tuple[ast.FunctionDef, str]:
@@ -114,6 +120,39 @@ def _parse_block(block: str) -> Dict[str, ast.FunctionDef]:
     }
 
 
+def _arg_names(args: ast.arguments) -> Sequence[str]:
+    names = [arg.arg for arg in args.posonlyargs + args.args]
+    if args.vararg:
+        names.append(f"*{args.vararg.arg}")
+    names.extend(f"kw:{arg.arg}" for arg in args.kwonlyargs)
+    if args.kwarg:
+        names.append(f"**{args.kwarg.arg}")
+    return names
+
+
+def _detect_conflicts(name: str, func_a: ast.FunctionDef, func_b: ast.FunctionDef) -> List[str]:
+    conflicts: List[str] = []
+    args_a = _arg_names(func_a.args)
+    args_b = _arg_names(func_b.args)
+    if args_a != args_b:
+        conflicts.append(
+            f"Signature mismatch for {name}: {args_a!r} vs {args_b!r}"
+        )
+    returns_a = ast.unparse(func_a.returns) if func_a.returns else "None"
+    returns_b = ast.unparse(func_b.returns) if func_b.returns else "None"
+    if returns_a != returns_b:
+        conflicts.append(
+            f"Return annotation mismatch for {name}: {returns_a!r} vs {returns_b!r}"
+        )
+    doc_a = ast.get_docstring(func_a)
+    doc_b = ast.get_docstring(func_b)
+    if doc_a and doc_b and doc_a != doc_b:
+        conflicts.append(f"Docstring divergence for {name}")
+    if not func_a.body or not func_b.body:
+        conflicts.append(f"Empty body detected for {name}")
+    return conflicts
+
+
 def perform_ast_crossover(
     parent_a: ProgramCandidate,
     parent_b: ProgramCandidate,
@@ -128,7 +167,7 @@ def perform_ast_crossover(
     block_b = _extract_block(source_b)
     functions_a = _parse_block(block_a)
     functions_b = _parse_block(block_b)
-    merged_functions, notes = _merge_functions(functions_a, functions_b)
+    merged_functions, notes, conflicts = _merge_functions(functions_a, functions_b)
     module = ast.Module(body=merged_functions, type_ignores=[])
     ast.fix_missing_locations(module)
     merged_block = textwrap.dedent(ast.unparse(module)).strip()
@@ -153,6 +192,7 @@ def perform_ast_crossover(
     patch_payload["metadata"] = {
         "strategy": "ast_mix",
         "notes": notes,
+        "conflicts": conflicts,
     }
 
     behavior = BehaviorFeatures(
@@ -166,6 +206,7 @@ def perform_ast_crossover(
         strategy="ast_mix",
         description="; ".join(notes) if notes else "Inherited blocks",
         fragments=len(merged_functions),
+        conflicts=conflicts,
     )
 
     return CrossoverResult(

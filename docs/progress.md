@@ -27,12 +27,12 @@
   3. 对接指标日志（OpenTelemetry/OpenMetrics），实现 `run_id` 级追踪。
 
 ### 3.2 候选生成与谱系
-- **现状**：`generation.py` 内的 `ProgramGenerator` 支持基于 EVOLVE-BLOCK 的多样随机生成，跟踪父代与提示臂；`GeminiAgentAdapter` 可直接调用已登录的 `gemini-cli` 并在失败时回退模板；`perform_ast_crossover` 现已集成，允许在 `SelectionStrategy` 中以概率方式触发双亲融合。
-- **缺口**：交叉结果尚未输出冲突分级或补丁清洁度报告，缺少自动化 `repair` 模板；谱系信息仍未同步至 Git/远程存储，CLI 错误恢复仅支持一次模板回退。
+- **现状**：`generation.py` 的 `ProgramGenerator` 现已从 `configs/problems.json` 载入多问题基线，按 `problem_id` 生成候选并在修复路径中注入失败上下文；`GeminiAgentAdapter` 保持 CLI 集成并支持元数据透传；`perform_ast_crossover` 结合 `SelectionStrategy` 的岛屿调度，允许在同问题域内进行 AST 拼接。新增的 `GitLineageTracker` 会在 `.artifacts/git_lineage/` 内为每个候选提交代码与补丁元数据，并回填 `git_commit` 至候选谱系。
+- **缺口**：交叉冲突目前仅在日志和候选元数据中标注，尚未生成差异级联或可视化报告；Git 谱系同步仍局限于本地仓库，未对接远端推送与签名；CLI 多模型路由与限流策略尚未实现。
 - **计划**：
-  1. 扩展 `GeminiAgentAdapter` 接入提示上下文的失败日志摘要，并支持多模型路由与限流重试。
-  2. 为交叉与失败候选引入 `repair`/微补丁流水线，并记录冲突、撤销与评分结果。
-  3. 与 `solutions/workdir/` 建立 Git 分支或工作树写入，补充 `patch.diff`、谱系与遥测元数据，支撑回放与审计。
+  1. 基于冲突元数据生成结构化报告（含冲突类型、涉及函数、降级路径）并纳入档案/仪表盘。
+  2. 拓展 `GeminiAgentAdapter` 支持多后端选择与速率控制，加入失败重试与退避策略。
+  3. 将 `.artifacts/git_lineage/` 与远端 Git 仓库对接（含签名、审计分支），并在重播流程中引用对应 commit。
 
 ### 3.3 评测级联与调度
 - **现状**：`ProblemEvaluator.evaluate` 支持 L3 压测、对抗/噪声数据、运行时分位数；`TierExecutor` 依据 `TierSpec.max_cyclomatic/max_runtime_ms` 判定通过，`bench.py` 可在压力模式下输出 JSON。
@@ -43,12 +43,12 @@
   3. 在多问题集上回归评测，以验证压力样例的泛化效果。
 
 ### 3.4 档案、选择与品质多样性
-- **现状**：评测行为特征已由 `ProblemEvaluator` 填充运行时分位数与覆盖度；`ArchiveManager` 计算新颖度并维护 MAP-Elites 网格；`SelectionStrategy` 利用拥挤距离、新颖度退火与 35% 交叉概率挑选后代，同时将种群写入快照供重启恢复。
-- **缺口**：MAP-Elites 快照虽已可落盘，但仍缺少岛屿迁徙策略与可视化导出；交叉暂未生成冲突报告或自动修复补丁，无法评估融合质量。
+- **现状**：评测行为特征已由 `ProblemEvaluator` 填充运行时分位数与覆盖度；`ArchiveManager` 在更新时同步写出 MAP-Elites/ Pareto 快照，并触发 `.artifacts/dashboard.html` 热力图渲染；`SelectionStrategy` 引入岛屿成员表、按问题域约束交叉并触发 10% 迁徙，快照恢复时同步重建岛屿信息，同时会记录 AST 交叉冲突并写入候选元数据。
+- **缺口**：岛屿迁徙策略仍缺少基于失败标签的动态调度，可视化尚未展示历代指标曲线；交叉质量报告待进一步量化并导出成图表。
 - **计划**：
-  1. 将档案快照导出为 CSV/JSON，并在 `docs/observability.md` 提到的面板中展示。
-  2. 实装岛屿迁徙策略，结合失败标签调度移民，并针对 MAP-Elites 稀疏格实施重点采样。
-  3. 为交叉流程添加冲突降级、补丁评分与谱系可视化输出。
+  1. 扩展迁徙策略，结合失败类型与 MAP-Elites 稀疏格定向采样移民，并将迁徙日志写入快照。
+  2. 在观测面板中叠加历代 Pareto 指标、迁徙记录以及冲突统计，完善 `.artifacts/dashboard.html`。
+  3. 为交叉产物生成差异摘要与冲突降级报告，并输出谱系可视化数据。
 
 ### 3.5 缓存与可复现
 - **现状**：`CacheManager` 支持环境指纹、命中率统计与 `FilesystemCacheBackend` 持久化；`CacheEntry` 可序列化 JSON。
@@ -59,20 +59,20 @@
   3. 将缓存指标上报至可观测性面板。
 
 ### 3.6 提示工程与多臂老虎机
-- **现状**：`PromptBandit` 引入 `PromptGenome`，支持指令随机化、温度调节、失败标签 checklist；奖励衰减结合历史轨迹。
-- **缺口**：尚未根据评测日志自动注入上下文片段；提示 A/B 统计需要持久化。
+- **现状**：`PromptBandit` 引入 `PromptGenome`，支持指令随机化、温度调节、失败标签 checklist；奖励衰减结合历史轨迹，并自动导出 `.artifacts/prompt_telemetry.json` 供观测面板消费。
+- **缺口**：尚未根据评测日志自动注入上下文片段；提示成效暂未与问题域、岛屿标签进行关联分析。
 - **计划**：
   1. 将失败日志摘要注入提示上下文，形成领域化反馈。
-  2. 记录每臂调用次数与收益，导出 A/B 指标至观测面板。
+  2. 在 `prompt_telemetry.json` 基础上生成多臂老虎机分析图表（成功率、迁徙贡献等）。
   3. 探索模板交叉/突变策略以扩大提示基因库。
 
 ### 3.7 问题库与基线解决方案
-- **现状**：`problems/sample_problem/` 提供基线问题、数据生成、测试、基准脚本；`solutions/workdir/sample_solution.py` 包含 EVOLVE-BLOCK。
-- **缺口**：问题库规模有限，未覆盖性能/鲁棒/多目标场景；`data_gen.py` 与 `bench.py` 仅包含示例级逻辑。
+- **现状**：`problems/sample_problem/`、`problems/shortest_path/`、`problems/knapsack/` 均提供 spec、数据生成、对抗样本与基准脚本；对应 `solutions/workdir/` 下 baseline 已包含 EVOLVE-BLOCK 标注。
+- **缺口**：仍缺乏更多性能/鲁棒双目标案例及跨领域问题；benchmark 输出尚未纳入集中报表。
 - **计划**：
-  1. 新增多个问题包（如最短路、背包、排序优化），每个问题包括 spec、oracle、数据生成、测试与 benchmark。
-  2. 扩展基准脚本输出（性能中位数/IQR、内存峰值），并与评测缓存集成。
-  3. 为每个问题提供初始解与 EVOLVE-BLOCK 标注，确保可复现起点。
+  1. 扩展问题集至并行/数值稳定等场景，并为每类问题准备性能与鲁棒双指标基线。
+  2. 将基准脚本的 JSON 输出汇总至统一目录，供 CI 与观测面板消费。
+  3. 构建多问题回归套件（如矩阵或夜间作业）以评估扩展后的岛屿与迁徙策略。
 
 ### 3.8 CI/CD 与自动化
 - **现状**：`evolve` workflow 包含质量门禁（ruff/mypy/pytest）与两轮候选演示，并上传 `.artifacts`；`pyproject.toml` 提供 dev 依赖。
@@ -83,11 +83,11 @@
   3. 在 README 中补充 GitHub Actions 使用指南。
 
 ### 3.9 文档、观测与治理
-- **现状**：新增《docs/runbook.md》《docs/governance.md》《docs/observability.md》覆盖操作、治理、指标；总体设计与进度文档同步更新。
-- **缺口**：开发者 API 指南仍待撰写；观测面板需落地原型。
+- **现状**：新增《docs/runbook.md》《docs/governance.md》《docs/observability.md》覆盖操作、治理、指标；总体设计与进度文档同步更新；观测面板章节已记录 `.artifacts/dashboard.html` 及 prompt telemetry 导出方式。
+- **缺口**：开发者 API 指南仍待撰写；观测面板需从静态 HTML 拓展至交互式仪表盘，并叠加缓存/提示指标。
 - **计划**：
   1. 编写 API/模块参考文档，便于扩展模块接入。
-  2. 实现观测面板 MVP（Streamlit 或 Grafana）。
+  2. 实现交互式观测面板 MVP（Streamlit 或 Grafana），消费地图、Pareto、提示与缓存数据。
   3. 形成 run replay 指南与自动化报表模板。
 
 ## 4. 综合路线图
@@ -125,8 +125,11 @@
 - [x] `caching.py`：支持外部缓存后端与命中率指标。
 - [x] `docs/`：补充运行手册、治理策略、观测面板草图。
 - [x] `.github/workflows/evolve.yml`：并发矩阵、artifact 上传、静态检查。
-- [ ] `generation.py`：接入自动化 `repair` 模板、交叉冲突分级与 CLI 重试节流策略。
-- [ ] `selection.py`：输出岛屿迁徙与 MAP-Elites 可视化数据工件。
-- [ ] `problems/`：新增性能/鲁棒双目标问题包并在 CI 中演示多问题矩阵。
+- [x] `generation.py`：接入自动化 `repair` 模板、按问题维度生成候选并保留 CLI 元数据。
+- [x] `selection.py`：输出岛屿迁徙快照与 MAP-Elites JSON 工件。
+- [x] `problems/`：新增最短路与背包问题包，并在 CI 中引入多问题矩阵演示。
+- [x] `.artifacts/map_elites.json`：导出后触发 `dashboard.html` 生成，提供热力图与 Pareto 概览。
+- [x] `prompt_policy.py`：输出 `prompt_telemetry.json` 供提示分析。
+- [ ] `observability/`：在 HTML 仪表盘基础上扩展交互式面板并叠加缓存/提示指标。
 
 > 随着功能推进，此文档将持续更新，确保每个里程碑的工作量、依赖关系与风险透明可跟踪。

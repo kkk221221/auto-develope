@@ -21,14 +21,15 @@
 
 ## 3. 数据导出
 
-1. **档案热力图**：遍历 `ArchiveManager.state.map_elites_cells`，统计 `(complexity_bin, robustness_bin)` 占用情况，可生成矩阵图像。
-2. **Pareto 前沿**：`ArchiveManager.state.pareto_front` 提供候选 ID，结合 `ProgramCandidate.metrics` 绘制多目标散点。
-3. **缓存统计**：`CacheManager.report()` 返回 `lookups/hits/hit_rate/entries`，可按时间序列写入 Prometheus Gauge。
-4. **提示臂表现**：`PromptArm` 内的 `successes/failures/recent_reward` 与 `PromptGenome.history` 可输出成折线图，观察元提示演化效果。
+1. **档案热力图**：遍历 `ArchiveManager.state.map_elites_cells`，统计 `(complexity_bin, robustness_bin)` 占用情况，可生成矩阵图像；系统默认同时渲染 `.artifacts/dashboard.html` 提供静态可视化。
+2. **MAP-Elites 快照**：`EvolutionOrchestrator` 会将 `ArchiveManager.snapshot()` 写入 `.artifacts/map_elites.json`，可直接供面板或离线分析使用。
+3. **Pareto 前沿**：`ArchiveManager.state.pareto_front` 提供候选 ID，结合 `ProgramCandidate.metrics` 绘制多目标散点。
+4. **缓存统计**：`CacheManager.report()` 返回 `lookups/hits/hit_rate/entries`，可按时间序列写入 Prometheus Gauge。
+5. **提示臂表现**：`PromptBandit.export_telemetry` 会生成 `.artifacts/prompt_telemetry.json`，其中包含成功率、温度与 checklist，适合作为 A/B 报表输入。
 
 ## 4. 可视化建议
 
-- **Streamlit 仪表盘**：快速构建交互式面板，展示 Pareto 点云、MAP-Elites 热力图、缓存命中率曲线、提示臂奖励趋势。
+- **Streamlit 仪表盘**：快速构建交互式面板，展示 Pareto 点云、MAP-Elites 热力图、缓存命中率曲线、提示臂奖励趋势；可直接读取 `.artifacts/map_elites.json`、`.artifacts/dashboard.html` 与 `.artifacts/prompt_telemetry.json`。
 - **Grafana/Prometheus**：若部署在集群中，可将指标上报至 Prometheus，Grafana 中配置仪表盘：
   - 图表 1：每级评测通过率（Stacked Bar）；
   - 图表 2：性能分位数（Line + Filled Area）；

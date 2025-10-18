@@ -1,10 +1,11 @@
 """Prompt bandit policy and prompt metadata utilities."""
 from __future__ import annotations
 
+import json
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 from .models import PromptArm
 
@@ -18,6 +19,24 @@ class PromptMaterialization:
     content: str
     generation: int
     checklist: List[str]
+
+    def with_context(self, context: Sequence[str] | str) -> "PromptMaterialization":
+        """Return a copy of the prompt augmented with additional context."""
+
+        if isinstance(context, str):
+            context_lines = [context]
+        else:
+            context_lines = [str(item) for item in context]
+        if not context_lines:
+            return self
+        augmented = "\n".join([self.content, "", "Context:", *context_lines])
+        return PromptMaterialization(
+            name=self.name,
+            backend=self.backend,
+            content=augmented,
+            generation=self.generation,
+            checklist=list(self.checklist),
+        )
 
 
 @dataclass
@@ -132,10 +151,25 @@ class PromptBandit:
             with open(path, "r", encoding="utf-8") as handle:
                 lines = [line.rstrip("\n") for line in handle]
             backend = "flash"
+            problem_id = "sample_problem"
+            intent = "mutate"
+            island: str | None = None
             cursor = 0
-            if lines and lines[0].startswith("backend:"):
-                backend = lines[0].split(":", 1)[1].strip() or "flash"
-                cursor = 1
+            while cursor < len(lines) and ":" in lines[cursor] and not lines[cursor].startswith("-"):
+                key, value = lines[cursor].split(":", 1)
+                key = key.strip().lower()
+                value = value.strip()
+                if key == "backend":
+                    backend = value or "flash"
+                elif key == "problem":
+                    problem_id = value or "sample_problem"
+                elif key == "intent":
+                    intent = value or "mutate"
+                elif key == "island":
+                    island = value or None
+                else:
+                    break
+                cursor += 1
             title = lines[cursor].strip() if cursor < len(lines) else f"Prompt {path.stem}"
             instructions: List[str] = []
             checklist: List[str] = []
@@ -155,6 +189,9 @@ class PromptBandit:
                 checklist = [f"Report metrics for {path.stem}"]
             name = path.stem
             arms[name] = PromptArm(name=name, template_path=str(path))
+            arms[name].problem_id = problem_id
+            arms[name].intent = intent
+            arms[name].island = island
             templates[name] = PromptGenome(
                 name=name,
                 backend=backend,
@@ -166,10 +203,35 @@ class PromptBandit:
             raise ValueError(f"No prompt templates found in {directory}")
         return cls(arms=arms, templates=templates)
 
-    def pick_prompt(self) -> Tuple[str, PromptMaterialization]:
+    def pick_prompt(
+        self,
+        *,
+        intent: str = "mutate",
+        problem_id: str | None = None,
+        exclude_island: str | None = None,
+        prefer_island: str | None = None,
+    ) -> Tuple[str, PromptMaterialization]:
+        candidates = [
+            (name, arm)
+            for name, arm in self.arms.items()
+            if arm.intent == intent
+            and (problem_id is None or arm.problem_id in {problem_id, "*"})
+        ]
+        if exclude_island:
+            filtered = [item for item in candidates if item[1].island != exclude_island]
+            if filtered:
+                candidates = filtered
+        if prefer_island:
+            preferred = [item for item in candidates if item[1].island == prefer_island]
+            if preferred:
+                candidates = preferred
+        if not candidates:
+            if intent != "mutate":
+                raise ValueError(f"No prompt arms available for intent {intent}")
+            candidates = list(self.arms.items())
         scored = {
             name: random.betavariate(arm.successes, arm.failures)
-            for name, arm in self.arms.items()
+            for name, arm in candidates
         }
         chosen_name = max(scored, key=lambda candidate: scored[candidate])
         materialised = self.templates[chosen_name].materialise()
@@ -182,7 +244,9 @@ class PromptBandit:
         return "flash"
 
     def update_reward(self, arm_name: str, reward: float) -> None:
-        arm = self.arms[arm_name]
+        arm = self.arms.get(arm_name)
+        if not arm:
+            return
         clipped = max(0.0, min(1.0, reward))
         decay = max(0.0, (arm.horizon_generations - 1) / max(arm.horizon_generations, 1))
         arm.successes = 1.0 + decay * (arm.successes - 1.0) + clipped
@@ -200,6 +264,14 @@ class PromptBandit:
             if note not in template.checklist:
                 template.checklist.append(note)
 
+    def island_for_arm(self, arm_name: str) -> str | None:
+        arm = self.arms.get(arm_name)
+        return arm.island if arm else None
+
+    def problem_for_arm(self, arm_name: str) -> str | None:
+        arm = self.arms.get(arm_name)
+        return arm.problem_id if arm else None
+
     def snapshot(self) -> Dict[str, Any]:
         """Returns a JSON-serialisable snapshot of the bandit state."""
 
@@ -207,6 +279,9 @@ class PromptBandit:
             name: {
                 "name": arm.name,
                 "template_path": arm.template_path,
+                "problem_id": arm.problem_id,
+                "intent": arm.intent,
+                "island": arm.island,
                 "successes": arm.successes,
                 "failures": arm.failures,
                 "recent_reward": arm.recent_reward,
@@ -234,6 +309,10 @@ class PromptBandit:
                 if arm is None:
                     arm = PromptArm(name=name, template_path=str(payload.get("template_path", "")))
                     self.arms[name] = arm
+                arm.problem_id = str(payload.get("problem_id", arm.problem_id))
+                arm.intent = str(payload.get("intent", arm.intent))
+                island_value = payload.get("island")
+                arm.island = str(island_value) if island_value is not None else None
                 try:
                     arm.successes = float(payload.get("successes", arm.successes))
                     arm.failures = float(payload.get("failures", arm.failures))
@@ -269,3 +348,37 @@ class PromptBandit:
                     )
                     self.templates[name] = genome
                 genome.apply_payload(payload)
+
+    def telemetry(self) -> Dict[str, Any]:
+        """Returns a structured view of bandit arm performance."""
+
+        arms = {
+            name: {
+                "problem_id": arm.problem_id,
+                "intent": arm.intent,
+                "island": arm.island,
+                "successes": arm.successes,
+                "failures": arm.failures,
+                "recent_reward": arm.recent_reward,
+                "temperature": self.templates[name].temperature
+                if name in self.templates
+                else None,
+            }
+            for name, arm in self.arms.items()
+        }
+        templates = {
+            name: {
+                "generation": genome.generation,
+                "history": list(genome.history),
+                "checklist": list(genome.checklist),
+            }
+            for name, genome in self.templates.items()
+        }
+        return {"arms": arms, "templates": templates}
+
+    def export_telemetry(self, output_path: Path) -> None:
+        """Writes telemetry to disk for dashboards or analytics."""
+
+        payload = self.telemetry()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 from types import ModuleType
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from .models import BehaviorFeatures, EvaluationResult, Metrics, ProgramCandidate
 
@@ -31,10 +31,12 @@ class TierSpec:
 class ProblemEvaluator:
     """Executes problem-specific evaluations for a candidate program."""
 
-    def __init__(self, problem_package: str) -> None:
-        self.problem_package = problem_package
-        self._data_gen = importlib.import_module(f"{problem_package}.data_gen")
-        self._oracle = importlib.import_module(f"{problem_package}.oracle")
+    def __init__(self, problem_packages: Mapping[str, str]) -> None:
+        if not problem_packages:
+            raise ValueError("ProblemEvaluator requires at least one problem package")
+        self.problem_packages = dict(problem_packages)
+        self._data_generators: Dict[str, ModuleType] = {}
+        self._oracles: Dict[str, ModuleType] = {}
 
     def evaluate(
         self,
@@ -45,20 +47,24 @@ class ProblemEvaluator:
         percentiles: Optional[Sequence[float]] = None,
         stress_suites: Optional[Sequence[str]] = None,
     ) -> tuple[Metrics, BehaviorFeatures]:
+        if candidate.problem_id not in self.problem_packages:
+            raise KeyError(f"Unknown problem id: {candidate.problem_id}")
+        data_gen = self._load_data_gen(candidate.problem_id)
+        oracle = self._load_oracle(candidate.problem_id)
         scores: List[float] = []
         runtimes: List[float] = []
         for _ in range(repeats):
-            samples = self._data_gen.generate_samples(dataset_size)
+            samples = data_gen.generate_samples(dataset_size)
             start = perf_counter()
             candidate_score = self._execute_solver(candidate.source_path, samples)
             runtime_ms = (perf_counter() - start) * 1000
-            reference_score = self._oracle.evaluate_solution(samples)
+            reference_score = oracle.evaluate_solution(samples)
             scores.append(self._score_accuracy(candidate_score, reference_score))
             runtimes.append(runtime_ms)
 
         accuracy = statistics.fmean(scores)
         runtime_ms = statistics.fmean(runtimes)
-        robustness = self._measure_robustness(candidate)
+        robustness = self._measure_robustness(candidate, data_gen, oracle)
         loc = self._count_loc(candidate.source_path)
         cyclomatic = self._estimate_cyclomatic(candidate.source_path)
         llm_style = self._estimate_style(candidate.source_path)
@@ -67,6 +73,8 @@ class ProblemEvaluator:
         if stress:
             stress_scores = self._run_stress_suites(
                 candidate,
+                data_gen=data_gen,
+                oracle=oracle,
                 suites=list(stress_suites or []),
             )
             if stress_scores:
@@ -92,6 +100,22 @@ class ProblemEvaluator:
         )
         return metrics, behavior
 
+    def _load_data_gen(self, problem_id: str) -> ModuleType:
+        module = self._data_generators.get(problem_id)
+        if module is None:
+            package = self.problem_packages[problem_id]
+            module = importlib.import_module(f"{package}.data_gen")
+            self._data_generators[problem_id] = module
+        return module
+
+    def _load_oracle(self, problem_id: str) -> ModuleType:
+        module = self._oracles.get(problem_id)
+        if module is None:
+            package = self.problem_packages[problem_id]
+            module = importlib.import_module(f"{package}.oracle")
+            self._oracles[problem_id] = module
+        return module
+
     def _execute_solver(self, source_path: str, samples: Iterable) -> float:
         module = self._load_module(source_path)
         if not hasattr(module, "solve"):
@@ -114,11 +138,17 @@ class ProblemEvaluator:
         delta = abs(candidate_score - reference_score) / denom
         return max(0.0, 1.0 - delta)
 
-    def _measure_robustness(self, candidate: ProgramCandidate) -> float:
-        samples: List = [(1, 2), (3, 4), (0, 0)]
+    def _measure_robustness(
+        self,
+        candidate: ProgramCandidate,
+        data_gen: ModuleType,
+        oracle: ModuleType,
+    ) -> float:
+        samples = data_gen.generate_samples(4)
         try:
             _ = self._execute_solver(candidate.source_path, samples)
             _ = self._execute_solver(candidate.source_path, [])
+            oracle.evaluate_solution(samples)
         except Exception:
             return 0.0
         return 1.0
@@ -126,30 +156,33 @@ class ProblemEvaluator:
     def _run_stress_suites(
         self,
         candidate: ProgramCandidate,
+        *,
+        data_gen: ModuleType,
+        oracle: ModuleType,
         suites: Sequence[str],
     ) -> List[float]:
         scores: List[float] = []
         for suite in suites:
-            dataset = self._stress_samples_for_suite(suite)
+            dataset = self._stress_samples_for_suite(data_gen, suite)
             if not dataset:
                 continue
             try:
                 output = self._execute_solver(candidate.source_path, dataset)
-                reference = self._oracle.evaluate_solution(dataset)
+                reference = oracle.evaluate_solution(dataset)
                 scores.append(self._score_accuracy(output, reference))
             except Exception:  # pragma: no cover - defensive
                 scores.append(0.0)
         return scores
 
-    def _stress_samples_for_suite(self, suite: str) -> List:
-        if hasattr(self._data_gen, "generate_stress_samples"):
-            base = self._data_gen.generate_stress_samples()
+    def _stress_samples_for_suite(self, data_gen: ModuleType, suite: str) -> List:
+        if hasattr(data_gen, "generate_stress_samples"):
+            base = data_gen.generate_stress_samples()
         else:  # pragma: no cover - fallback path
             base = [(0, 0), (1000, -999), (-500, 250), (1, 1)]
-        if suite.startswith("adversarial") and hasattr(self._data_gen, "generate_adversarial_samples"):
-            return self._data_gen.generate_adversarial_samples()
-        if suite.startswith("noisy") and hasattr(self._data_gen, "generate_noisy_samples"):
-            return self._data_gen.generate_noisy_samples()
+        if suite.startswith("adversarial") and hasattr(data_gen, "generate_adversarial_samples"):
+            return data_gen.generate_adversarial_samples()
+        if suite.startswith("noisy") and hasattr(data_gen, "generate_noisy_samples"):
+            return data_gen.generate_noisy_samples()
         return base
 
     def _runtime_percentiles(

@@ -1,4 +1,4 @@
-"""Benchmark runner producing JSON metrics for the sample problem."""
+"""Benchmark runner for the shortest path problem."""
 from __future__ import annotations
 
 import json
@@ -9,18 +9,11 @@ from orchestrator.models import ProgramCandidate
 
 
 def run_benchmark(candidate_path: str | None = None) -> None:
-    source = Path(candidate_path or "solutions/workdir/sample_solution.py").resolve()
+    source = Path(candidate_path or "solutions/workdir/shortest_path_solution.py").resolve()
     candidate = ProgramCandidate(
-        id="benchmark",
-        parents=tuple(),
-        generation=0,
-        prompt_arm="benchmark",
-        llm_backend="flash",
-        patch_payload={},
-        source_path=str(source),
-        problem_id="sample_problem",
+        id="benchmark", parents=tuple(), generation=0, prompt_arm="benchmark", llm_backend="flash", patch_payload={}, source_path=str(source), problem_id="shortest_path"
     )
-    evaluator = ProblemEvaluator({"sample_problem": "problems.sample_problem"})
+    evaluator = ProblemEvaluator({"shortest_path": "problems.shortest_path"})
     metrics, _ = evaluator.evaluate(
         candidate,
         dataset_size=32,

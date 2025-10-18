@@ -50,6 +50,7 @@ class ProgramCandidate:
     patch_payload: Dict[str, object]
     problem_id: str = "sample_problem"
     source_path: str = ""
+    lineage_commit: str = ""
     metrics: Metrics = field(default_factory=Metrics)
     behavior: BehaviorFeatures = field(default_factory=BehaviorFeatures)
     eval_passes: List[str] = field(default_factory=list)
@@ -67,6 +68,9 @@ class PromptArm:
 
     name: str
     template_path: str
+    problem_id: str = "sample_problem"
+    intent: str = "mutate"
+    island: str | None = None
     successes: float = 1.0
     failures: float = 1.0
     recent_reward: float = 0.0
@@ -258,6 +262,7 @@ def candidate_to_payload(candidate: ProgramCandidate) -> Dict[str, Any]:
         "patch_payload": candidate.patch_payload,
         "problem_id": candidate.problem_id,
         "source_path": candidate.source_path,
+        "lineage_commit": candidate.lineage_commit,
         "metrics": metrics_to_payload(candidate.metrics),
         "behavior": behavior_to_payload(candidate.behavior),
         "eval_passes": list(candidate.eval_passes),
@@ -300,6 +305,7 @@ def candidate_from_payload(payload: Mapping[str, Any]) -> ProgramCandidate:
         patch_payload=cast(Dict[str, object], payload.get("patch_payload", {})),
         problem_id=str(payload.get("problem_id", "sample_problem")),
         source_path=str(payload.get("source_path", "")),
+        lineage_commit=str(payload.get("lineage_commit", "")),
         metrics=metrics_from_payload(cast(Mapping[str, Any], payload.get("metrics", {}))),
         behavior=behavior_from_payload(cast(Mapping[str, Any], payload.get("behavior"))),
         eval_passes=list(payload.get("eval_passes", [])),

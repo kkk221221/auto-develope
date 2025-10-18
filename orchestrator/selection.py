@@ -253,9 +253,11 @@ class SelectionStrategy:
     novelty_alpha: float = 1.0
     novelty_tau: int = 8
     _population: Dict[str, ProgramCandidate] = field(default_factory=dict)
+    _island_members: Dict[str, set[str]] = field(default_factory=dict)
 
     def observe_candidate(self, candidate: ProgramCandidate) -> None:
         self._population[candidate.id] = candidate
+        self._register_island(candidate)
         self._truncate_population()
 
     def _truncate_population(self) -> None:
@@ -264,6 +266,10 @@ class SelectionStrategy:
         ranked = self._ranked_candidates()
         survivors = {candidate.id for candidate in ranked[: self.population_size * 2]}
         self._population = {cid: self._population[cid] for cid in survivors}
+        for island, members in list(self._island_members.items()):
+            members.intersection_update(survivors)
+            if not members:
+                self._island_members.pop(island, None)
 
     def _ranked_candidates(self) -> List[ProgramCandidate]:
         fronts = self.archive.get_fronts()
@@ -297,17 +303,49 @@ class SelectionStrategy:
             if parents:
                 parent_a, parent_b = parents
                 try:
-                    return generator.spawn_crossover_candidate(parent_a, parent_b)
+                    child = generator.spawn_crossover_candidate(parent_a, parent_b)
+                    metadata = child.patch_payload.get("metadata", {})
+                    plan = metadata.get("plan") if isinstance(metadata, dict) else None
+                    conflicts = []
+                    if isinstance(plan, dict):
+                        raw_conflicts = plan.get("conflicts", [])
+                        if isinstance(raw_conflicts, list):
+                            conflicts = [str(item) for item in raw_conflicts if item]
+                    if conflicts:
+                        LOGGER.info(
+                            "Crossover %s detected conflicts: %s",
+                            child.id,
+                            "; ".join(conflicts),
+                        )
+                    return child
                 except Exception as exc:  # pragma: no cover - defensive path
                     LOGGER.debug("Crossover failed, falling back to mutation: %s", exc)
         parent = self._sample_parent()
         if not parent:
             return None
-        arm = parent.prompt_arm if parent.prompt_arm in prompt_bandit.templates else self.default_prompt_arm
-        prompt = prompt_bandit.templates[arm].materialise()
+        target_problem = parent.problem_id
+        current_island = prompt_bandit.island_for_arm(parent.prompt_arm)
+        migrate = current_island is not None and random.random() < 0.1
+        if migrate:
+            arm, prompt = prompt_bandit.pick_prompt(
+                intent="mutate",
+                problem_id=target_problem,
+                exclude_island=current_island,
+            )
+        else:
+            try:
+                arm, prompt = prompt_bandit.pick_prompt(
+                    intent="mutate",
+                    problem_id=target_problem,
+                    prefer_island=current_island,
+                )
+            except ValueError:  # pragma: no cover - defensive
+                arm = self.default_prompt_arm
+                prompt = prompt_bandit.templates[arm].materialise()
         return generator.spawn_candidate(
             arm,
             prompt,
+            problem_id=target_problem,
             parents=(*parent.parents, parent.id),
             generation=parent.generation + 1,
         )
@@ -319,7 +357,11 @@ class SelectionStrategy:
         exclude = {first.id}
         for _ in range(5):
             second = self._sample_parent(exclude)
-            if second and second.id not in exclude:
+            if (
+                second
+                and second.id not in exclude
+                and second.problem_id == first.problem_id
+            ):
                 return first, second
         return None
 
@@ -357,12 +399,20 @@ class SelectionStrategy:
         return weighted[-1][1]
 
     def bootstrap_population(
-        self, generator: "ProgramGenerator", bandit: "PromptBandit"
+        self,
+        generator: "ProgramGenerator",
+        bandit: "PromptBandit",
+        problem_ids: Sequence[str],
     ) -> List[ProgramCandidate]:
         seeds: List[ProgramCandidate] = []
-        for _ in range(self.population_size):
-            arm_name, prompt = bandit.pick_prompt()
-            seeds.append(generator.spawn_candidate(arm_name, prompt))
+        if not problem_ids:
+            raise ValueError("At least one problem id required for bootstrapping")
+        index = 0
+        while len(seeds) < self.population_size:
+            problem_id = problem_ids[index % len(problem_ids)]
+            arm_name, prompt = bandit.pick_prompt(intent="mutate", problem_id=problem_id)
+            seeds.append(generator.spawn_candidate(arm_name, prompt, problem_id=problem_id))
+            index += 1
         return seeds
 
     def snapshot(self) -> Dict[str, Any]:
@@ -384,4 +434,12 @@ class SelectionStrategy:
                 if candidate:
                     new_population[candidate_id] = candidate
         self._population = new_population
+        self._island_members.clear()
+        for candidate in self._population.values():
+            self._register_island(candidate)
+
+    def _register_island(self, candidate: ProgramCandidate) -> None:
+        island = candidate.prompt_arm.rsplit(".", 1)[0]
+        members = self._island_members.setdefault(island, set())
+        members.add(candidate.id)
 

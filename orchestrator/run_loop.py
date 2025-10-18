@@ -2,19 +2,22 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import random
 from collections import deque
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Deque, Iterable, List, Optional
+from typing import Deque, Iterable, List, Mapping, Optional
 
 from .agents import GeminiAgentAdapter
 from .behaviors import extract_behavior_features
 from .caching import CacheManager
+from .dashboard import render_map_elites_dashboard
 from .evaluation import ProblemEvaluator, TierExecutor, load_tier_specs
 from .generation import ProgramGenerator
+from .git_lineage import GitLineageTracker
 from .models import (
     ArchiveState,
     EvalStatus,
@@ -26,6 +29,7 @@ from .models import (
 )
 from .prompt_policy import PromptBandit
 from .persistence import FilesystemPersistence, PersistenceGateway, RunState
+from .problem_specs import load_problem_specs
 from .scheduler import EvaluationScheduler
 from .selection import ArchiveManager, SelectionStrategy
 
@@ -46,7 +50,10 @@ class EvolutionOrchestrator:
         persistence: Optional[PersistenceGateway] = None,
     ) -> None:
         tier_specs = load_tier_specs(Path("configs/tiers.yaml"))
-        evaluator = ProblemEvaluator("problems.sample_problem")
+        package_map = {
+            problem_id: spec.package for problem_id, spec in program_generator.problem_specs.items()
+        }
+        evaluator = ProblemEvaluator(package_map)
         tier_executor = TierExecutor(tier_specs=tier_specs, evaluator=evaluator)
         self.scheduler = EvaluationScheduler(config=scheduler_config, tier_executor=tier_executor)
         self.prompt_bandit = prompt_bandit
@@ -54,8 +61,14 @@ class EvolutionOrchestrator:
         self.archive_manager = archive_manager
         self.cache_manager = cache_manager
         self.program_generator = program_generator
+        self.problem_ids = list(program_generator.problem_specs.keys())
+        self._problem_cycle: Deque[str] = deque(self.problem_ids)
         self.pending_candidates: Deque[ProgramCandidate] = deque()
         self.persistence = persistence
+        self.archive_export_path = Path(".artifacts/map_elites.json")
+        self.archive_export_path.parent.mkdir(parents=True, exist_ok=True)
+        self.dashboard_path = Path(".artifacts/dashboard.html")
+        self.prompt_telemetry_path = Path(".artifacts/prompt_telemetry.json")
         self._restored_from_state = False
         if self.persistence:
             state = self.persistence.load()
@@ -108,14 +121,22 @@ class EvolutionOrchestrator:
                     "Candidate %s failed tier %s; halting cascade", candidate.id, tier
                 )
                 self.prompt_bandit.ingest_feedback(candidate.prompt_arm, [f"{tier}_fail"])
+                failure_context = self._build_failure_context(candidate, result)
+                self._queue_repair_candidate(candidate, failure_context)
                 break
         else:
             LOGGER.info("Candidate %s completed all tiers", candidate.id)
 
         self.archive_manager.update(candidate)
+        self._export_archive()
         self.selection_strategy.observe_candidate(candidate)
         reward = self._score_prompt_reward(candidate.metrics)
         self.prompt_bandit.update_reward(candidate.prompt_arm, reward)
+        if self.prompt_telemetry_path:
+            try:
+                self.prompt_bandit.export_telemetry(self.prompt_telemetry_path)
+            except OSError as error:  # pragma: no cover - best effort only
+                LOGGER.debug("Failed to export prompt telemetry: %s", error)
         next_candidate = self.selection_strategy.select_next(self.program_generator, self.prompt_bandit)
         if next_candidate:
             LOGGER.info("Selected candidate %s for future evaluation", next_candidate.id)
@@ -124,9 +145,15 @@ class EvolutionOrchestrator:
         return candidate
 
     def _sample_and_generate(self) -> ProgramCandidate:
-        arm_name, prompt = self.prompt_bandit.pick_prompt()
-        candidate = self.program_generator.spawn_candidate(arm_name, prompt)
-        LOGGER.debug("Generating new candidate %s with arm %s", candidate.id, arm_name)
+        problem_id = self._next_problem_id()
+        arm_name, prompt = self.prompt_bandit.pick_prompt(intent="mutate", problem_id=problem_id)
+        candidate = self.program_generator.spawn_candidate(arm_name, prompt, problem_id=problem_id)
+        LOGGER.debug(
+            "Generating new candidate %s with arm %s for problem %s",
+            candidate.id,
+            arm_name,
+            problem_id,
+        )
         return candidate
 
     def _apply_result(
@@ -187,6 +214,89 @@ class EvolutionOrchestrator:
         self.cache_manager.restore(state.cache_snapshot)
         self.pending_candidates = deque(state.iter_pending())
 
+    def _next_problem_id(self) -> str:
+        if not self._problem_cycle:
+            raise RuntimeError("No problem ids configured for orchestrator")
+        problem_id = self._problem_cycle[0]
+        self._problem_cycle.rotate(-1)
+        return problem_id
+
+    def _queue_repair_candidate(
+        self, candidate: ProgramCandidate, failure_context: List[str]
+    ) -> None:
+        try:
+            arm, prompt = self.prompt_bandit.pick_prompt(
+                intent="repair", problem_id=candidate.problem_id
+            )
+        except ValueError:
+            LOGGER.debug("No repair prompt available for problem %s", candidate.problem_id)
+            return
+        prompt_with_context = prompt.with_context(failure_context)
+        repair_candidate = self.program_generator.spawn_candidate(
+            arm,
+            prompt_with_context,
+            problem_id=candidate.problem_id,
+            parents=(candidate.id,),
+            generation=candidate.generation + 1,
+            intent="repair",
+            failure_context="\n".join(failure_context),
+        )
+        LOGGER.info(
+            "Queued repair candidate %s for failed candidate %s",
+            repair_candidate.id,
+            candidate.id,
+        )
+        self.pending_candidates.appendleft(repair_candidate)
+
+    def _build_failure_context(
+        self, candidate: ProgramCandidate, result: EvaluationResult
+    ) -> List[str]:
+        metrics = result.metrics
+        context = [
+            f"candidate_id: {candidate.id}",
+            f"problem_id: {candidate.problem_id}",
+            f"tier: {result.tier}",
+            "status: failed",
+            (
+                "metrics: accuracy={:.3f}, runtime_ms={:.2f}, robustness={:.3f}, mem={:.2f}".format(
+                    metrics.accuracy,
+                    metrics.runtime_ms,
+                    metrics.robustness,
+                    metrics.memory_peak_mb,
+                )
+            ),
+            f"eval_passes: {candidate.eval_passes}",
+        ]
+        if result.logs_path:
+            context.append(f"logs_path: {result.logs_path}")
+        return context
+
+    def _export_archive(self) -> None:
+        if not self.archive_export_path:
+            return
+        snapshot = self.archive_manager.snapshot()
+        try:
+            with self.archive_export_path.open("w", encoding="utf-8") as handle:
+                json.dump(snapshot, handle, indent=2)
+        except OSError as error:  # pragma: no cover - best effort only
+            LOGGER.debug("Failed to export archive snapshot: %s", error)
+            return
+        self._render_dashboard(snapshot)
+
+    def _render_dashboard(self, snapshot: Mapping[str, object]) -> None:
+        if not self.dashboard_path:
+            return
+        try:
+            render_map_elites_dashboard(
+                snapshot,
+                self.archive_manager.candidates,
+                complexity_bins=self.archive_manager.complexity_bins,
+                robustness_bins=self.archive_manager.robustness_bins,
+                output_path=self.dashboard_path,
+            )
+        except Exception as error:  # pragma: no cover - best effort only
+            LOGGER.debug("Failed to render dashboard: %s", error)
+
 
 async def demo_run() -> None:
     """Demonstrates the orchestrator with mocked dependencies."""
@@ -210,15 +320,21 @@ async def demo_run() -> None:
         novelty_tau=scheduler_config.novelty_tau,
     )
     cache_manager = CacheManager()
-    baseline_path = Path("solutions/workdir/sample_solution.py")
+    problem_specs = load_problem_specs(Path("configs/problems.json"))
+    focus_problem = os.getenv("EVOLVE_PROBLEM")
+    if focus_problem and focus_problem in problem_specs:
+        ordered_ids = [focus_problem] + [pid for pid in problem_specs if pid != focus_problem]
+        problem_specs = {pid: problem_specs[pid] for pid in ordered_ids}
     agent: GeminiAgentAdapter | None = None
     cli_command = os.getenv("GEMINI_CLI_COMMAND")
     if cli_command:
         agent = GeminiAgentAdapter(cli_command=cli_command.split())
+    lineage_tracker = GitLineageTracker(Path(".artifacts/git_lineage"))
     generator = ProgramGenerator(
-        baseline_path=baseline_path,
+        problem_specs=problem_specs,
         output_root=Path(".artifacts/candidates"),
         agent=agent,
+        lineage_tracker=lineage_tracker,
     )
     persistence = FilesystemPersistence(Path(".artifacts/run_state.json"))
 
@@ -233,7 +349,11 @@ async def demo_run() -> None:
     )
 
     orchestrator.queue_initial_population(
-        selection.bootstrap_population(generator, prompt_bandit)
+        selection.bootstrap_population(
+            generator,
+            prompt_bandit,
+            list(problem_specs.keys()),
+        )
     )
     await orchestrator.run(max_steps=5)
 
