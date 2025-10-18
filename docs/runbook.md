@@ -111,3 +111,6 @@ python problems/knapsack/bench.py
 > python -m orchestrator.run_loop
 > ```
 > Orchestrator 会自动实例化 `LLMApiAgentAdapter`，通过 OpenAI Python SDK 与流式响应消费 JSON patch；若 API 响应异常，则回退到内置模板变异。
+> Agent **必须** 返回包含 `"version": 1` 与 `diff_type="sr"` 的 JSON，缺失时响应会被拒绝并触发短期熔断回退。
+
+> `ProblemEvaluator` 在独立子进程沙箱中执行候选 `solve()`，强制施加 `execution_timeout_s` 与 `memory_limit_mb` 限额；若进程超时或异常退出，会立即终止并记录失败信号。

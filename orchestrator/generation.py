@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import re
 import textwrap
+import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -739,6 +740,12 @@ def solve(pairs: Iterable[Tuple[int, int]]) -> float:
 
 
 @dataclass
+class _AgentCooldown:
+    failures: int = 0
+    cooldown_until: float = 0.0
+
+
+@dataclass
 class ProgramGenerator:
     """Applies mutations or agent-supplied patches to seed candidates."""
 
@@ -747,6 +754,8 @@ class ProgramGenerator:
     agent: Optional[LLMApiAgentAdapter] = None
     lineage_tracker: Optional[GitLineageTracker] = None
     _agent_enabled: bool = field(init=False, default=True)
+    agent_cooldown_base_s: float = 15.0
+    agent_cooldown_max_s: float = 180.0
 
     def __post_init__(self) -> None:
         if not self.problem_specs:
@@ -760,6 +769,7 @@ class ProgramGenerator:
         self.default_problem = next(iter(self.problem_specs))
         self.output_root.mkdir(parents=True, exist_ok=True)
         self._agent_enabled = self.agent is not None
+        self._agent_failures: Dict[str, _AgentCooldown] = {}
 
     def spawn_candidate(
         self,
@@ -871,7 +881,8 @@ class ProgramGenerator:
         prompt_to_use = prompt
         if failure_context:
             prompt_to_use = prompt.with_context(failure_context)
-        if self.agent and self._agent_enabled:
+        cooldown_key = f"{problem_id}:{arm_key}"
+        if self.agent and self._agent_enabled and not self._agent_in_cooldown(cooldown_key):
             try:
                 agent_result: AgentGeneration = self.agent.generate(prompt_to_use)
                 snippet = agent_result.snippet
@@ -886,10 +897,16 @@ class ProgramGenerator:
                         "intent": intent,
                     },
                 )
+                self._agent_failures.pop(cooldown_key, None)
                 return snippet, metadata
             except LLMApiAgentError as error:
-                LOGGER.warning("LLM API fallback for %s: %s", problem_id, error)
-                self._agent_enabled = False
+                LOGGER.warning(
+                    "LLM API fallback for problem=%s arm=%s: %s",
+                    problem_id,
+                    arm_key,
+                    error,
+                )
+                self._register_agent_failure(cooldown_key)
         if intent == "repair":
             snippet = _repair_snippet(problem_id, failure_context)
             metadata = cast(
@@ -922,6 +939,28 @@ class ProgramGenerator:
             },
         )
         return snippet, metadata
+
+    def _agent_in_cooldown(self, key: str) -> bool:
+        state = self._agent_failures.get(key)
+        if not state:
+            return False
+        now = time.monotonic()
+        if now >= state.cooldown_until:
+            self._agent_failures.pop(key, None)
+            return False
+        return True
+
+    def _register_agent_failure(self, key: str) -> None:
+        if key not in self._agent_failures:
+            self._agent_failures[key] = _AgentCooldown()
+        state = self._agent_failures[key]
+        state.failures += 1
+        base = max(1.0, float(self.agent_cooldown_base_s))
+        cooldown = min(
+            max(base, base * (2 ** (state.failures - 1))),
+            max(base, float(self.agent_cooldown_max_s)),
+        )
+        state.cooldown_until = time.monotonic() + cooldown
 
     def _record_lineage(self, candidate: ProgramCandidate) -> None:
         if not self.lineage_tracker:

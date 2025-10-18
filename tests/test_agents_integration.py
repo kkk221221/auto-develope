@@ -18,6 +18,7 @@ def test_llm_api_adapter_uses_real_api() -> None:
         pytest.skip("DASHSCOPE_API_KEY is not configured")
 
     expected_payload = {
+        "version": 1,
         "patches": [
             {
                 "diff_type": "sr",

@@ -190,10 +190,12 @@ class LLMApiAgentAdapter:
         """Invoke the API and parse the JSON response."""
 
         with self._rate_limiter:
-            payload = self._invoke_with_retries(prompt)
-        return self._parse_payload(payload)
+            payload, raw_response = self._invoke_with_retries(prompt)
+        return self._parse_payload(payload, raw_response)
 
-    def _invoke_with_retries(self, prompt: PromptMaterialization) -> Mapping[str, Any]:
+    def _invoke_with_retries(
+        self, prompt: PromptMaterialization
+    ) -> tuple[Mapping[str, Any], str]:
         attempt = 0
         while True:
             try:
@@ -204,7 +206,7 @@ class LLMApiAgentAdapter:
                 json_blob = self._extract_json_blob(response_text)
                 if not json_blob:
                     raise LLMApiAgentError("LLM API response did not include a JSON object")
-                return json.loads(json_blob)
+                return json.loads(json_blob), response_text
             except json.JSONDecodeError as exc:
                 raise LLMApiAgentError("LLM API returned invalid JSON") from exc
             except (APITimeoutError, TimeoutError) as exc:
@@ -393,22 +395,39 @@ class LLMApiAgentAdapter:
         jitter = random.uniform(0.85, 1.15)
         return max(0.25, base_delay * jitter)
 
-    def _parse_payload(self, payload: Mapping[str, Any]) -> AgentGeneration:
+    def _parse_payload(
+        self, payload: Mapping[str, Any], raw_response: str
+    ) -> AgentGeneration:
+        if not isinstance(payload, Mapping):
+            raise LLMApiAgentError("LLM API payload must be a JSON object")
+        version = payload.get("version")
+        try:
+            version_int = int(version)
+        except (TypeError, ValueError):
+            raise LLMApiAgentError("LLM API payload is missing a valid version field")
+        if version_int != 1:
+            raise LLMApiAgentError(
+                f"Unsupported LLM payload version: {version_int}"
+            )
         patches = payload.get("patches")
         snippet = ""
         metadata: MutableMapping[str, Any] = {
             "strategy": "llm_api",
+            "payload_version": version_int,
         }
         telemetry_tags: Sequence[str] = ()
         if isinstance(payload.get("telemetry_tags"), list):
             telemetry_tags = [str(tag) for tag in payload["telemetry_tags"]]
+        found_patch = False
         if isinstance(patches, list):
             for patch in patches:
                 if not isinstance(patch, Mapping):
                     continue
-                diff_type = str(patch.get("diff_type", "")).lower()
-                if diff_type != "sr":
-                    continue
+                diff_type = patch.get("diff_type")
+                if str(diff_type).lower() != "sr":
+                    raise LLMApiAgentError(
+                        f"Unsupported diff_type in patch payload: {diff_type}"
+                    )
                 patch_payload = patch.get("payload")
                 if isinstance(patch_payload, Mapping):
                     replacement = (
@@ -424,18 +443,15 @@ class LLMApiAgentAdapter:
                                 "file": patch.get("file", ""),
                             }
                         )
+                        found_patch = True
                         break
-                if isinstance(patch_payload, str) and patch_payload.strip():
+                elif isinstance(patch_payload, str) and patch_payload.strip():
                     snippet = patch_payload
                     metadata.update({"file": patch.get("file", "")})
+                    found_patch = True
                     break
-        if not snippet:
-            plan = payload.get("plan")
-            if isinstance(plan, list) and plan:
-                first_step = plan[0]
-                if isinstance(first_step, Mapping):
-                    snippet = str(first_step.get("snippet", ""))
-        if not snippet:
+        if not found_patch or not snippet.strip():
             raise LLMApiAgentError("LLM API response did not include a SEARCH/REPLACE payload")
         metadata.update({"telemetry": list(telemetry_tags)})
+        metadata["raw_response"] = raw_response[:4096]
         return AgentGeneration(snippet=snippet, metadata=metadata, telemetry_tags=telemetry_tags)

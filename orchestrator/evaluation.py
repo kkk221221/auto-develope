@@ -4,6 +4,7 @@ from __future__ import annotations
 import ast
 import importlib
 import importlib.util
+import multiprocessing
 import statistics
 import sys
 from dataclasses import dataclass
@@ -11,6 +12,11 @@ from pathlib import Path
 from time import perf_counter
 from types import ModuleType
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+
+try:  # pragma: no cover - resource may be unavailable on some platforms
+    import resource
+except ImportError:  # pragma: no cover - fallback for non-POSIX platforms
+    resource = None  # type: ignore[assignment]
 
 from .models import BehaviorFeatures, EvaluationResult, Metrics, ProgramCandidate
 
@@ -28,15 +34,52 @@ class TierSpec:
     max_runtime_ms: Optional[float] = None
 
 
+def _sandbox_worker(
+    source_path: str,
+    samples: Sequence,
+    memory_limit_bytes: int,
+    queue: multiprocessing.Queue,
+) -> None:
+    try:
+        if memory_limit_bytes > 0 and resource is not None:
+            try:
+                resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
+                resource.setrlimit(resource.RLIMIT_DATA, (memory_limit_bytes, memory_limit_bytes))
+            except (ValueError, OSError):  # pragma: no cover - defensive
+                pass
+        module_name = f"candidate_{Path(source_path).stem}_{hash(source_path) & 0xFFFF:x}"
+        spec = importlib.util.spec_from_file_location(module_name, source_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Unable to load candidate module from {source_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        if not hasattr(module, "solve"):
+            raise AttributeError("Candidate module must define solve()")
+        solve = getattr(module, "solve")
+        result = float(solve(samples))
+        queue.put(("ok", result))
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        queue.put(("error", f"{type(exc).__name__}: {exc}"))
+
+
 class ProblemEvaluator:
     """Executes problem-specific evaluations for a candidate program."""
 
-    def __init__(self, problem_packages: Mapping[str, str]) -> None:
+    def __init__(
+        self,
+        problem_packages: Mapping[str, str],
+        *,
+        execution_timeout_s: float = 5.0,
+        memory_limit_mb: int = 256,
+    ) -> None:
         if not problem_packages:
             raise ValueError("ProblemEvaluator requires at least one problem package")
         self.problem_packages = dict(problem_packages)
         self._data_generators: Dict[str, ModuleType] = {}
         self._oracles: Dict[str, ModuleType] = {}
+        self.execution_timeout_s = max(0.5, float(execution_timeout_s))
+        self.memory_limit_mb = max(64, int(memory_limit_mb))
 
     def evaluate(
         self,
@@ -117,21 +160,39 @@ class ProblemEvaluator:
         return module
 
     def _execute_solver(self, source_path: str, samples: Iterable) -> float:
-        module = self._load_module(source_path)
-        if not hasattr(module, "solve"):
-            raise AttributeError("Candidate module must define solve()")
-        solve = getattr(module, "solve")
-        return float(solve(samples))
-
-    def _load_module(self, source_path: str) -> ModuleType:
-        module_name = f"candidate_{Path(source_path).stem}_{hash(source_path) & 0xFFFF:x}"
-        spec = importlib.util.spec_from_file_location(module_name, source_path)
-        if spec is None or spec.loader is None:
-            raise ImportError(f"Unable to load candidate module from {source_path}")
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        return module
+        dataset = list(samples)
+        memory_bytes = int(self.memory_limit_mb * 1024 * 1024)
+        ctx = multiprocessing.get_context("spawn")
+        queue: multiprocessing.Queue = ctx.Queue(maxsize=1)
+        process = ctx.Process(
+            target=_sandbox_worker,
+            args=(source_path, dataset, memory_bytes, queue),
+            daemon=True,
+        )
+        process.start()
+        process.join(self.execution_timeout_s)
+        if process.is_alive():
+            process.terminate()
+            process.join()
+            queue.close()
+            queue.join_thread()
+            raise TimeoutError(
+                f"Candidate execution exceeded {self.execution_timeout_s:.2f}s sandbox limit"
+            )
+        if not queue.empty():
+            status, payload = queue.get()
+            queue.close()
+            queue.join_thread()
+            if status == "ok":
+                return float(payload)
+            raise RuntimeError(f"Candidate execution failed: {payload}")
+        queue.close()
+        queue.join_thread()
+        if process.exitcode and process.exitcode != 0:
+            raise RuntimeError(
+                f"Candidate execution terminated with exit code {process.exitcode}"
+            )
+        raise RuntimeError("Candidate execution produced no result")
 
     def _score_accuracy(self, candidate_score: float, reference_score: float) -> float:
         denom = max(abs(reference_score), 1.0)

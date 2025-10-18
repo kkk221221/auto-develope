@@ -6,3 +6,4 @@ island: crossover
 - merge complementary strengths from parent patches
 - resolve conflicting edits conservatively
 - emit SEARCH/REPLACE payload anchored by shared context
+- respond with JSON containing "version": 1 and at least one SEARCH/REPLACE patch
