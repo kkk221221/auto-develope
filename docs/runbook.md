@@ -28,7 +28,15 @@ python -m orchestrator.run_loop
 - 通过 `TierExecutor` 调用 `ProblemEvaluator`，获取指标与 `BehaviorFeatures`；
 - 将结果写入 `ArchiveManager`、`SelectionStrategy` 与缓存。
 
-### 2.2 运行测试与静态检查
+> ℹ️ Demo 运行会自动启用 `FilesystemPersistence`，将档案、种群、Bandit 状态、缓存摘要与待评估队列写入 `.artifacts/run_state.json`。重新执行命令将从快照恢复；如需重新开始，可手动删除该文件。
+
+### 2.2 断点续跑与持久化
+
+- 生产模式建议显式实例化 `FilesystemPersistence(Path("/path/to/state.json"))`，并传入 `EvolutionOrchestrator` 构造函数。
+- 利用 `orchestrator/persistence.py` 中的 `RunState` 可对 `pending_candidates` 做离线分析，或在 CI 结束后保存状态供下次运行继续。
+- 若需导出数据库版本，可实现自定义 `PersistenceGateway`（例如写入 PostgreSQL/对象存储），再传入 orchestrator。
+
+### 2.3 运行测试与静态检查
 
 ```bash
 ruff check .
@@ -38,7 +46,7 @@ pytest -q
 
 CI Workflow `evolve` 会在 `quality` job 中执行以上三步，确保提交满足质量门槛。
 
-### 2.3 运行基准脚本
+### 2.4 运行基准脚本
 
 ```bash
 python problems/sample_problem/bench.py

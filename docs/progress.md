@@ -19,11 +19,11 @@
 ## 3. 子系统梳理
 
 ### 3.1 编排与生命周期管理
-- **现状**：`orchestrator/run_loop.py` 管理父代采样、缓存命中、评测级联、档案更新与提示奖励；`models.py` 定义候选/指标/档案数据类。
-- **缺口**：缺少与外部存储（PostgreSQL、对象存储）的接口，运行记录仅驻留内存；缺乏失败回放与断点续跑。
+- **现状**：`orchestrator/run_loop.py` 管理父代采样、缓存命中、评测级联、档案更新与提示奖励；`models.py` 定义候选/指标/档案数据类；新增 `PersistenceGateway` 与 `FilesystemPersistence`，可将档案、种群、Bandit、缓存与待评估队列落盘并在重启后恢复。
+- **缺口**：仍缺乏与外部存储（PostgreSQL、对象存储）的连接，断点数据目前仅存于本地 JSON；失败回放尚未接入统一 API。
 - **计划**：
-  1. 抽象仓储接口（`PersistenceGateway`），在 `run_loop.py` 中替换内存状态。
-  2. 提供 run checkpoint 序列化（候选、档案、bandit、缓存）及恢复脚本。
+  1. 将 `PersistenceGateway` 扩展至数据库/对象存储实现，支撑集群共享状态。
+  2. 在持久化快照基础上输出 run replay 脚本与指标重放流程。
   3. 对接指标日志（OpenTelemetry/OpenMetrics），实现 `run_id` 级追踪。
 
 ### 3.2 候选生成与谱系

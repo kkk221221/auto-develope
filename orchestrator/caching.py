@@ -6,7 +6,7 @@ import json
 import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Protocol
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol
 
 from .models import CacheEntry, EvaluationResult, ProgramCandidate
 
@@ -45,6 +45,16 @@ class CacheStats:
 
     def snapshot(self) -> Dict[str, float]:
         return {"lookups": float(self.lookups), "hits": float(self.hits), "hit_rate": self.hit_rate}
+
+    def apply_snapshot(self, payload: Mapping[str, Any]) -> None:
+        """Restores hit/miss counters from a payload."""
+
+        try:
+            self.lookups = int(payload.get("lookups", self.lookups))
+            self.hits = int(payload.get("hits", self.hits))
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            self.lookups = 0
+            self.hits = 0
 
 
 @dataclass
@@ -172,4 +182,24 @@ class CacheManager:
         payload = self.stats.snapshot()
         payload["entries"] = float(len(list(self.backend.keys())))
         return payload
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Returns a serialisable snapshot of the cache manager state."""
+
+        return {
+            "environment": self.environment_fingerprint,
+            "stats": self.stats.snapshot(),
+        }
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        """Restores cache metadata from a snapshot."""
+
+        if not isinstance(snapshot, Mapping):
+            return
+        environment = snapshot.get("environment")
+        if environment:
+            self.environment_fingerprint = str(environment)
+        stats_payload = snapshot.get("stats")
+        if isinstance(stats_payload, Mapping):
+            self.stats.apply_snapshot(stats_payload)
 

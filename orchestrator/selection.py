@@ -5,9 +5,9 @@ import logging
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
 
-from .models import ArchiveState, ProgramCandidate
+from .models import ArchiveState, ProgramCandidate, candidate_from_payload, candidate_to_payload
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from .generation import ProgramGenerator
@@ -187,6 +187,61 @@ class ArchiveManager:
         robustness_bin = min(self.robustness_bins - 1, int(robustness * self.robustness_bins))
         return (int(complexity_bin), int(robustness_bin))
 
+    def snapshot(self) -> Dict[str, Any]:
+        """Returns a serialisable snapshot of archive and candidate state."""
+
+        map_elites = {
+            f"{key[0]},{key[1]}": value for key, value in self.state.map_elites_cells.items()
+        }
+        return {
+            "state": {
+                "pareto_front": list(self.state.pareto_front),
+                "map_elites_cells": map_elites,
+            },
+            "candidates": {
+                cid: candidate_to_payload(candidate)
+                for cid, candidate in self.candidates.items()
+            },
+        }
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        """Restores archive and candidate state from a snapshot."""
+
+        if not isinstance(snapshot, Mapping):
+            return
+        state_payload = snapshot.get("state", {})
+        pareto_front = []
+        map_elites: Dict[Tuple[int, int], str] = {}
+        if isinstance(state_payload, Mapping):
+            pareto_raw = state_payload.get("pareto_front", [])
+            if isinstance(pareto_raw, list):
+                pareto_front = [str(item) for item in pareto_raw]
+            map_payload = state_payload.get("map_elites_cells", {})
+            if isinstance(map_payload, Mapping):
+                for key, value in map_payload.items():
+                    if not isinstance(key, str):
+                        continue
+                    try:
+                        x_str, y_str = key.split(",", 1)
+                        map_elites[(int(x_str), int(y_str))] = str(value)
+                    except ValueError:  # pragma: no cover - defensive
+                        continue
+        candidates_payload = snapshot.get("candidates", {})
+        restored: Dict[str, ProgramCandidate] = {}
+        if isinstance(candidates_payload, Mapping):
+            for cid, payload in candidates_payload.items():
+                if not isinstance(payload, Mapping):
+                    continue
+                candidate = candidate_from_payload(payload)
+                restored[candidate.id] = candidate
+        self.candidates = restored
+        self.state.pareto_front = pareto_front
+        self.state.map_elites_cells = map_elites
+        fronts = _non_dominated_sort(self.candidates.values()) if self.candidates else []
+        self._front_cache = [[candidate.id for candidate in front] for front in fronts]
+        if self._front_cache:
+            self.state.pareto_front = self._front_cache[0]
+
 
 @dataclass
 class SelectionStrategy:
@@ -306,4 +361,24 @@ class SelectionStrategy:
         for _ in range(self.population_size):
             seeds.append(generator.spawn_candidate(self.default_prompt_arm, backend="flash"))
         return seeds
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Serialises the tracked population."""
+
+        return {
+            "population": [candidate_id for candidate_id in self._population],
+        }
+
+    def restore(self, snapshot: Mapping[str, Any], archive: ArchiveManager) -> None:
+        """Restores the tracked population from a snapshot."""
+
+        population_payload = snapshot.get("population") if isinstance(snapshot, Mapping) else None
+        new_population: Dict[str, ProgramCandidate] = {}
+        if isinstance(population_payload, list):
+            for item in population_payload:
+                candidate_id = str(item)
+                candidate = archive.candidates.get(candidate_id)
+                if candidate:
+                    new_population[candidate_id] = candidate
+        self._population = new_population
 

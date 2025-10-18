@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, cast
 
 
 class EvalStatus(str, Enum):
@@ -181,4 +181,134 @@ class CacheEntry:
             metrics=metrics,
             created_at=created_at,
         )
+
+
+def metrics_to_payload(metrics: Metrics) -> Dict[str, Any]:
+    """Serialises a Metrics instance into JSON-friendly primitives."""
+
+    return {
+        "accuracy": metrics.accuracy,
+        "runtime_ms": metrics.runtime_ms,
+        "memory_peak_mb": metrics.memory_peak_mb,
+        "loc": metrics.loc,
+        "cyclomatic": metrics.cyclomatic,
+        "robustness": metrics.robustness,
+        "llm_style": metrics.llm_style,
+    }
+
+
+def metrics_from_payload(payload: Mapping[str, Any]) -> Metrics:
+    """Rehydrates Metrics from primitive values."""
+
+    return Metrics(
+        accuracy=float(payload.get("accuracy", 0.0)),
+        runtime_ms=float(payload.get("runtime_ms", 0.0)),
+        memory_peak_mb=float(payload.get("memory_peak_mb", 0.0)),
+        loc=int(payload.get("loc", 0)),
+        cyclomatic=float(payload.get("cyclomatic", 0.0)),
+        robustness=float(payload.get("robustness", 0.0)),
+        llm_style=float(payload.get("llm_style", 0.0)),
+    )
+
+
+def behavior_to_payload(behavior: BehaviorFeatures) -> Dict[str, Any]:
+    """Converts behaviour descriptors to a portable payload."""
+
+    return {
+        "coverage_bits": list(behavior.coverage_bits),
+        "hotspots": dict(behavior.hotspots),
+        "output_signature": behavior.output_signature,
+    }
+
+
+def behavior_from_payload(payload: Optional[Mapping[str, Any]]) -> BehaviorFeatures:
+    """Reconstructs behaviour descriptors from a payload."""
+
+    if payload is None:
+        return BehaviorFeatures()
+    coverage = payload.get("coverage_bits", [])
+    hotspots_raw = payload.get("hotspots", {})
+    if isinstance(coverage, (list, tuple)):
+        coverage_bits = tuple(int(item) for item in coverage)
+    else:
+        coverage_bits = ()
+    hotspots: Dict[str, float] = {}
+    if isinstance(hotspots_raw, Mapping):
+        for key, value in hotspots_raw.items():
+            try:
+                hotspots[str(key)] = float(value)  # type: ignore[arg-type]
+            except (TypeError, ValueError):  # pragma: no cover - defensive
+                continue
+    return BehaviorFeatures(
+        coverage_bits=coverage_bits,
+        hotspots=hotspots,
+        output_signature=str(payload.get("output_signature", "")),
+    )
+
+
+def candidate_to_payload(candidate: ProgramCandidate) -> Dict[str, Any]:
+    """Serialises a ProgramCandidate (including metrics and behaviour)."""
+
+    payload: Dict[str, Any] = {
+        "id": candidate.id,
+        "parents": list(candidate.parents),
+        "generation": candidate.generation,
+        "prompt_arm": candidate.prompt_arm,
+        "llm_backend": candidate.llm_backend,
+        "patch_payload": candidate.patch_payload,
+        "problem_id": candidate.problem_id,
+        "source_path": candidate.source_path,
+        "metrics": metrics_to_payload(candidate.metrics),
+        "behavior": behavior_to_payload(candidate.behavior),
+        "eval_passes": list(candidate.eval_passes),
+        "status": candidate.status.value,
+        "created_at": candidate.created_at.isoformat(),
+        "evaluated_at": candidate.evaluated_at.isoformat() if candidate.evaluated_at else None,
+        "novelty_score": candidate.novelty_score,
+        "pareto_rank": candidate.pareto_rank,
+        "crowding_distance": candidate.crowding_distance,
+    }
+    return payload
+
+
+def candidate_from_payload(payload: Mapping[str, Any]) -> ProgramCandidate:
+    """Rehydrates a ProgramCandidate from a serialised payload."""
+
+    created_raw = payload.get("created_at")
+    created_at = (
+        datetime.fromisoformat(str(created_raw))
+        if created_raw
+        else datetime.now(timezone.utc)
+    )
+    evaluated_raw = payload.get("evaluated_at")
+    evaluated_at = (
+        datetime.fromisoformat(str(evaluated_raw))
+        if evaluated_raw
+        else None
+    )
+    status_raw = str(payload.get("status", EvalStatus.PENDING.value))
+    try:
+        status = EvalStatus(status_raw)
+    except ValueError:  # pragma: no cover - defensive
+        status = EvalStatus.PENDING
+    candidate = ProgramCandidate(
+        id=str(payload.get("id", "")),
+        parents=tuple(str(item) for item in payload.get("parents", [])),
+        generation=int(payload.get("generation", 0)),
+        prompt_arm=str(payload.get("prompt_arm", "")),
+        llm_backend=str(payload.get("llm_backend", "")),
+        patch_payload=cast(Dict[str, object], payload.get("patch_payload", {})),
+        problem_id=str(payload.get("problem_id", "sample_problem")),
+        source_path=str(payload.get("source_path", "")),
+        metrics=metrics_from_payload(cast(Mapping[str, Any], payload.get("metrics", {}))),
+        behavior=behavior_from_payload(cast(Mapping[str, Any], payload.get("behavior"))),
+        eval_passes=list(payload.get("eval_passes", [])),
+        status=status,
+        created_at=created_at,
+        evaluated_at=evaluated_at,
+        novelty_score=float(payload.get("novelty_score", 0.0)),
+        pareto_rank=int(payload.get("pareto_rank", 0)),
+        crowding_distance=float(payload.get("crowding_distance", 0.0)),
+    )
+    return candidate
 

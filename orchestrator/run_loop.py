@@ -21,8 +21,10 @@ from .models import (
     Metrics,
     ProgramCandidate,
     SchedulerConfig,
+    candidate_to_payload,
 )
 from .prompt_policy import PromptBandit
+from .persistence import FilesystemPersistence, PersistenceGateway, RunState
 from .scheduler import EvaluationScheduler
 from .selection import ArchiveManager, SelectionStrategy
 
@@ -40,6 +42,7 @@ class EvolutionOrchestrator:
         archive_manager: ArchiveManager,
         cache_manager: CacheManager,
         program_generator: ProgramGenerator,
+        persistence: Optional[PersistenceGateway] = None,
     ) -> None:
         tier_specs = load_tier_specs(Path("configs/tiers.yaml"))
         evaluator = ProblemEvaluator("problems.sample_problem")
@@ -51,13 +54,25 @@ class EvolutionOrchestrator:
         self.cache_manager = cache_manager
         self.program_generator = program_generator
         self.pending_candidates: Deque[ProgramCandidate] = deque()
+        self.persistence = persistence
+        self._restored_from_state = False
+        if self.persistence:
+            state = self.persistence.load()
+            if state:
+                LOGGER.info("Restoring orchestrator state from persistence")
+                self._restore_from_state(state)
+                self._restored_from_state = True
 
     def queue_initial_population(self, seeds: Iterable[ProgramCandidate]) -> None:
         """Seed the orchestrator with an initial population."""
 
+        if self._restored_from_state:
+            LOGGER.info("Persisted state present; skipping initial seeding")
+            return
         for candidate in seeds:
             LOGGER.info("Queueing seed candidate %s", candidate.id)
             self.pending_candidates.append(candidate)
+        self._persist_state()
 
     async def step(self) -> Optional[ProgramCandidate]:
         """Executes a single orchestration step."""
@@ -104,6 +119,7 @@ class EvolutionOrchestrator:
         if next_candidate:
             LOGGER.info("Selected candidate %s for future evaluation", next_candidate.id)
             self.pending_candidates.append(next_candidate)
+        self._persist_state()
         return candidate
 
     def _sample_and_generate(self) -> ProgramCandidate:
@@ -151,6 +167,25 @@ class EvolutionOrchestrator:
             steps += 1
         return completed
 
+    def _persist_state(self) -> None:
+        if not self.persistence:
+            return
+        state = RunState(
+            archive_snapshot=self.archive_manager.snapshot(),
+            selection_snapshot=self.selection_strategy.snapshot(),
+            prompt_snapshot=self.prompt_bandit.snapshot(),
+            cache_snapshot=self.cache_manager.snapshot(),
+            pending_candidates=[candidate_to_payload(candidate) for candidate in self.pending_candidates],
+        )
+        self.persistence.save(state)
+
+    def _restore_from_state(self, state: RunState) -> None:
+        self.archive_manager.restore(state.archive_snapshot)
+        self.selection_strategy.restore(state.selection_snapshot, self.archive_manager)
+        self.prompt_bandit.restore(state.prompt_snapshot)
+        self.cache_manager.restore(state.cache_snapshot)
+        self.pending_candidates = deque(state.iter_pending())
+
 
 async def demo_run() -> None:
     """Demonstrates the orchestrator with mocked dependencies."""
@@ -176,6 +211,7 @@ async def demo_run() -> None:
     cache_manager = CacheManager()
     baseline_path = Path("solutions/workdir/sample_solution.py")
     generator = ProgramGenerator(baseline_path=baseline_path, output_root=Path(".artifacts/candidates"))
+    persistence = FilesystemPersistence(Path(".artifacts/run_state.json"))
 
     orchestrator = EvolutionOrchestrator(
         scheduler_config=scheduler_config,
@@ -184,6 +220,7 @@ async def demo_run() -> None:
         archive_manager=archive_manager,
         cache_manager=cache_manager,
         program_generator=generator,
+        persistence=persistence,
     )
 
     orchestrator.queue_initial_population(selection.bootstrap_population(generator))

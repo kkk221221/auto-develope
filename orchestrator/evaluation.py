@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 from types import ModuleType
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence
+from typing import Dict, Iterable, List, Optional, Sequence
 
 from .models import BehaviorFeatures, EvaluationResult, Metrics, ProgramCandidate
 
