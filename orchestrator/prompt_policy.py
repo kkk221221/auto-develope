@@ -1,0 +1,553 @@
+"""Prompt bandit policy and prompt metadata utilities."""
+from __future__ import annotations
+
+import json
+import math
+import random
+from collections import defaultdict
+from collections.abc import Iterable as IterableABC
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Sequence, Tuple
+
+from .models import PromptArm
+
+
+JSON_SCHEMA_GUIDANCE: Sequence[str] = (
+    "Output strictly a minified JSON object matching this schema (no markdown or prose):",
+    '{"version":1,"patches":[{"diff_type":"sr","file":"<problem_file>","payload":{"search":"<existing block>","replace":"<replacement block>"}}],"telemetry_tags":[]}',
+    "Use \"patches\":[] if you truly have no safe change.\n- diff_type must stay \"sr\".\n- payload.search must be an exact substring copied from the EVOLVE block shown in context.\n- payload.replace must contain the entire EVOLVE block after your edits (include unchanged lines, only update what you modify).\n- file must map from the problem id: sample_problem -> solutions/workdir/sample_solution.py, shortest_path -> solutions/workdir/shortest_path_solution.py, knapsack -> solutions/workdir/knapsack_solution.py.",
+)
+
+
+@dataclass
+class PromptMaterialization:
+    """Rendered prompt ready for use by an agent backend."""
+
+    name: str
+    backend: str
+    content: str
+    generation: int
+    checklist: List[str]
+
+    def with_context(self, context: Sequence[str] | str) -> "PromptMaterialization":
+        """Return a copy of the prompt augmented with additional context."""
+
+        if isinstance(context, str):
+            context_lines = [context]
+        else:
+            context_lines = [str(item) for item in context]
+        if not context_lines:
+            return self
+        augmented = "\n".join([self.content, "", "Context:", *context_lines])
+        return PromptMaterialization(
+            name=self.name,
+            backend=self.backend,
+            content=augmented,
+            generation=self.generation,
+            checklist=list(self.checklist),
+        )
+
+
+@dataclass
+class PromptGenome:
+    """Mutable prompt template tracked by the bandit."""
+
+    name: str
+    backend: str
+    title: str
+    instructions: List[str]
+    checklist: List[str] = field(default_factory=list)
+    temperature: float = 0.7
+    generation: int = 0
+    history: List[float] = field(default_factory=list)
+
+    def materialise(self) -> PromptMaterialization:
+        """Render the prompt with lightweight mutations for diversity."""
+
+        instructions = list(self.instructions)
+        random.shuffle(instructions)
+        header = [f"backend: {self.backend}", self.title]
+        lines: List[str] = header[:]
+        for idx, instruction in enumerate(instructions, 1):
+            emphasis = 1.0 + (idx * 0.05) + (0.5 - self.temperature)
+            lines.append(f"{idx}. ({emphasis:.2f}) {instruction}")
+        if JSON_SCHEMA_GUIDANCE:
+            lines.append("")
+            lines.extend(JSON_SCHEMA_GUIDANCE)
+        if self.checklist:
+            lines.append("")
+            lines.append("Checklist:")
+            for item in self.checklist:
+                lines.append(f"- {item}")
+        content = "\n".join(lines)
+        return PromptMaterialization(
+            name=self.name,
+            backend=self.backend,
+            content=content,
+            generation=self.generation,
+            checklist=list(self.checklist),
+        )
+
+    def evolve(self, reward: float) -> None:
+        """Update template weights/checklists based on the observed reward."""
+
+        self.history.append(reward)
+        self.temperature = min(1.0, max(0.2, self.temperature + 0.2 * (0.5 - reward)))
+        if reward < 0.35 and len(self.instructions) > 1:
+            rotated = self.instructions.pop(0)
+            self.instructions.append(rotated)
+        elif reward > 0.75:
+            random.shuffle(self.instructions)
+        if reward < 0.5:
+            failure_note = f"Re-evaluate failure modes (reward={reward:.2f})"
+            if failure_note not in self.checklist:
+                self.checklist.append(failure_note)
+        self.generation += 1
+
+    def to_payload(self) -> Dict[str, Any]:
+        """Serialises the genome to JSON-friendly primitives."""
+
+        return {
+            "name": self.name,
+            "backend": self.backend,
+            "title": self.title,
+            "instructions": list(self.instructions),
+            "checklist": list(self.checklist),
+            "temperature": self.temperature,
+            "generation": self.generation,
+            "history": list(self.history),
+        }
+
+    def apply_payload(self, payload: Mapping[str, Any]) -> None:
+        """Restores mutable fields from a payload."""
+
+        self.backend = str(payload.get("backend", self.backend))
+        self.title = str(payload.get("title", self.title))
+        instructions = payload.get("instructions")
+        if isinstance(instructions, list):
+            self.instructions = [str(item) for item in instructions]
+        checklist = payload.get("checklist")
+        if isinstance(checklist, list):
+            self.checklist = [str(item) for item in checklist]
+        try:
+            self.temperature = float(payload.get("temperature", self.temperature))
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            pass
+        try:
+            self.generation = int(payload.get("generation", self.generation))
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            pass
+        history = payload.get("history")
+        if isinstance(history, list):
+            cleaned: List[float] = []
+            for item in history:
+                try:
+                    cleaned.append(float(item))
+                except (TypeError, ValueError):  # pragma: no cover - defensive
+                    continue
+            self.history = cleaned
+
+
+class PromptBandit:
+    """Implements Thompson sampling over prompt template arms with meta evolution."""
+
+    def __init__(self, arms: Dict[str, PromptArm], templates: Dict[str, PromptGenome]) -> None:
+        self.arms = arms
+        self.templates = templates
+        self._invalid_reason_histograms: Dict[str, MutableMapping[str, int]] = defaultdict(dict)
+        self._linucb_dim = 6
+        self._linucb_alpha = 0.8
+        self._alpha_min = 0.3
+        self._alpha_max = 1.2
+        self._linucb_A_inv: Dict[str, List[List[float]]] = {}
+        self._linucb_b: Dict[str, List[float]] = {}
+        self._last_features: Dict[str, List[float]] = {}
+        for name in arms:
+            self._ensure_linucb_state(name)
+
+    @classmethod
+    def from_directory(cls, directory: str) -> "PromptBandit":
+        arms: Dict[str, PromptArm] = {}
+        templates: Dict[str, PromptGenome] = {}
+        for path in Path(directory).glob("*.md"):
+            with open(path, "r", encoding="utf-8") as handle:
+                lines = [line.rstrip("\n") for line in handle]
+            backend = "flash"
+            problem_id = "sample_problem"
+            intent = "mutate"
+            island: str | None = None
+            cursor = 0
+            while cursor < len(lines) and ":" in lines[cursor] and not lines[cursor].startswith("-"):
+                key, value = lines[cursor].split(":", 1)
+                key = key.strip().lower()
+                value = value.strip()
+                if key == "backend":
+                    backend = value or "flash"
+                elif key == "problem":
+                    problem_id = value or "sample_problem"
+                elif key == "intent":
+                    intent = value or "mutate"
+                elif key == "island":
+                    island = value or None
+                else:
+                    break
+                cursor += 1
+            title = lines[cursor].strip() if cursor < len(lines) else f"Prompt {path.stem}"
+            instructions: List[str] = []
+            checklist: List[str] = []
+            for raw_line in lines[cursor + 1 :]:
+                stripped = raw_line.strip()
+                if not stripped:
+                    continue
+                if stripped.lower().startswith("checklist:"):
+                    continue
+                if stripped.startswith("-"):
+                    instructions.append(stripped.lstrip("- "))
+                elif stripped.startswith("*"):
+                    checklist.append(stripped.lstrip("* "))
+                else:
+                    instructions.append(stripped)
+            if not checklist:
+                checklist = [f"Report metrics for {path.stem}"]
+            name = path.stem
+            arms[name] = PromptArm(name=name, template_path=str(path))
+            arms[name].problem_id = problem_id
+            arms[name].intent = intent
+            arms[name].island = island
+            templates[name] = PromptGenome(
+                name=name,
+                backend=backend,
+                title=title,
+                instructions=instructions or ["Use EVOLVE-BLOCK mutations"],
+                checklist=checklist,
+            )
+        if not arms:
+            raise ValueError(f"No prompt templates found in {directory}")
+        return cls(arms=arms, templates=templates)
+
+    def pick_prompt(
+        self,
+        *,
+        intent: str = "mutate",
+        problem_id: str | None = None,
+        exclude_island: str | None = None,
+        prefer_island: str | None = None,
+        context: Mapping[str, object] | None = None,
+    ) -> Tuple[str, PromptMaterialization]:
+        candidates = [
+            (name, arm)
+            for name, arm in self.arms.items()
+            if arm.intent == intent
+            and (problem_id is None or arm.problem_id in {problem_id, "*"})
+        ]
+        if exclude_island:
+            filtered = [item for item in candidates if item[1].island != exclude_island]
+            if filtered:
+                candidates = filtered
+        if prefer_island:
+            preferred = [item for item in candidates if item[1].island == prefer_island]
+            if preferred:
+                candidates = preferred
+        if not candidates:
+            if intent != "mutate":
+                raise ValueError(f"No prompt arms available for intent {intent}")
+            candidates = list(self.arms.items())
+        context = context or {}
+        scored: Dict[str, float] = {}
+        success_window = float(context.get("success_window", 0.0)) if context else 0.0
+        invalid_window = float(context.get("invalid_window", 0.0)) if context else 0.0
+        for name, arm in candidates:
+            base = random.betavariate(max(arm.successes, 1e-3), max(arm.failures, 1e-3))
+            features = self._context_features(name, context)
+            self._ensure_linucb_state(name)
+            A_inv = self._linucb_A_inv[name]
+            b_vec = self._linucb_b[name]
+            theta = self._mat_vec_mul(A_inv, b_vec)
+            exploitation = self._dot(theta, features)
+            exploration = self._linucb_alpha * math.sqrt(max(self._quad_form(A_inv, features), 1e-12))
+            penalty = 0.05 * self.arms[name].invalid_responses
+            penalty += 0.05 * features[4]  # recent invalid density
+            scored[name] = base + exploitation + exploration - penalty
+        chosen_name = max(scored, key=lambda candidate: scored[candidate])
+        materialised = self.templates[chosen_name].materialise()
+        self._last_features[chosen_name] = self._context_features(chosen_name, context)
+        return chosen_name, materialised
+
+    def backend_for_arm(self, arm_name: str) -> str:
+        template = self.templates.get(arm_name)
+        if template:
+            return template.backend
+        return "flash"
+
+    def update_reward(self, arm_name: str, reward: float) -> None:
+        arm = self.arms.get(arm_name)
+        if not arm:
+            return
+        clipped = max(0.0, min(1.0, reward))
+        decay = max(0.0, (arm.horizon_generations - 1) / max(arm.horizon_generations, 1))
+        arm.successes = 1.0 + decay * (arm.successes - 1.0) + clipped
+        arm.failures = 1.0 + decay * (arm.failures - 1.0) + (1.0 - clipped)
+        arm.recent_reward = clipped
+        if arm_name in self.templates:
+            self.templates[arm_name].evolve(clipped)
+        self._linucb_update(arm_name, clipped)
+        if clipped > 0.7:
+            self._linucb_alpha = max(self._alpha_min, self._linucb_alpha * 0.99)
+
+    def ingest_feedback(self, arm_name: str, failure_tags: Iterable[str]) -> None:
+        template = self.templates.get(arm_name)
+        if not template:
+            return
+        for tag in failure_tags:
+            note = f"Investigate {tag}"
+            if note not in template.checklist:
+                template.checklist.append(note)
+
+    def island_for_arm(self, arm_name: str) -> str | None:
+        arm = self.arms.get(arm_name)
+        return arm.island if arm else None
+
+    def problem_for_arm(self, arm_name: str) -> str | None:
+        arm = self.arms.get(arm_name)
+        return arm.problem_id if arm else None
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Returns a JSON-serialisable snapshot of the bandit state."""
+
+        arms_payload = {
+            name: {
+                "name": arm.name,
+                "template_path": arm.template_path,
+                "problem_id": arm.problem_id,
+                "intent": arm.intent,
+                "island": arm.island,
+                "successes": arm.successes,
+                "failures": arm.failures,
+                "recent_reward": arm.recent_reward,
+                "horizon_generations": arm.horizon_generations,
+                "invalid_responses": arm.invalid_responses,
+                "invalid_reasons": dict(self._invalid_reason_histograms.get(name, {})),
+            }
+            for name, arm in self.arms.items()
+        }
+        templates_payload = {
+            name: genome.to_payload() for name, genome in self.templates.items()
+        }
+        return {
+            "arms": arms_payload,
+            "templates": templates_payload,
+            "linucb": {
+                "alpha": self._linucb_alpha,
+                "A_inv": {name: matrix for name, matrix in self._linucb_A_inv.items()},
+                "b": {name: vector for name, vector in self._linucb_b.items()},
+            },
+        }
+
+    def restore(self, snapshot: Mapping[str, Any]) -> None:
+        """Restores bandit state from a snapshot payload."""
+
+        self._invalid_reason_histograms = defaultdict(dict)
+        arms_payload = snapshot.get("arms", {})
+        if isinstance(arms_payload, Mapping):
+            for name, payload in arms_payload.items():
+                if not isinstance(payload, Mapping):
+                    continue
+                arm = self.arms.get(name)
+                if arm is None:
+                    arm = PromptArm(name=name, template_path=str(payload.get("template_path", "")))
+                    self.arms[name] = arm
+                arm.problem_id = str(payload.get("problem_id", arm.problem_id))
+                arm.intent = str(payload.get("intent", arm.intent))
+                island_value = payload.get("island")
+                arm.island = str(island_value) if island_value is not None else None
+                try:
+                    arm.successes = float(payload.get("successes", arm.successes))
+                    arm.failures = float(payload.get("failures", arm.failures))
+                    arm.recent_reward = float(payload.get("recent_reward", arm.recent_reward))
+                    arm.horizon_generations = int(payload.get("horizon_generations", arm.horizon_generations))
+                    arm.invalid_responses = float(payload.get("invalid_responses", arm.invalid_responses))
+                except (TypeError, ValueError):  # pragma: no cover - defensive
+                    continue
+                reasons = payload.get("invalid_reasons")
+                if isinstance(reasons, Mapping):
+                    self._invalid_reason_histograms[name] = {
+                        str(reason): int(count)
+                        for reason, count in reasons.items()
+                        if isinstance(count, (int, float))
+                    }
+                self._ensure_linucb_state(name)
+        templates_payload = snapshot.get("templates", {})
+        if isinstance(templates_payload, Mapping):
+            for name, payload in templates_payload.items():
+                if not isinstance(payload, Mapping):
+                    continue
+                genome = self.templates.get(name)
+                if genome is None:
+                    backend = str(payload.get("backend", "flash"))
+                    title = str(payload.get("title", f"Prompt {name}"))
+                    instructions = payload.get("instructions")
+                    if isinstance(instructions, list) and instructions:
+                        inst = [str(item) for item in instructions]
+                    else:
+                        inst = ["Use EVOLVE-BLOCK mutations"]
+                    checklist = payload.get("checklist")
+                    if isinstance(checklist, list):
+                        check = [str(item) for item in checklist]
+                    else:
+                        check = [f"Report metrics for {name}"]
+                    genome = PromptGenome(
+                        name=name,
+                        backend=backend,
+                        title=title,
+                        instructions=inst,
+                        checklist=check,
+                    )
+                    self.templates[name] = genome
+                genome.apply_payload(payload)
+                self._ensure_linucb_state(name)
+        linucb_payload = snapshot.get("linucb", {}) if isinstance(snapshot, Mapping) else {}
+        alpha = linucb_payload.get("alpha")
+        try:
+            if alpha is not None:
+                self._linucb_alpha = float(alpha)
+        except (TypeError, ValueError):  # pragma: no cover - defensive
+            pass
+        matrices = linucb_payload.get("A_inv", {})
+        if isinstance(matrices, Mapping):
+            for name, matrix in matrices.items():
+                if isinstance(matrix, list):
+                    self._linucb_A_inv[name] = [list(map(float, row)) for row in matrix if isinstance(row, list)]
+        vectors = linucb_payload.get("b", {})
+        if isinstance(vectors, Mapping):
+            for name, vector in vectors.items():
+                if isinstance(vector, list):
+                    self._linucb_b[name] = [float(item) for item in vector]
+                    self._ensure_linucb_state(name)
+
+    def telemetry(self) -> Dict[str, Any]:
+        """Returns a structured view of bandit arm performance."""
+
+        arms = {
+            name: {
+                "problem_id": arm.problem_id,
+                "intent": arm.intent,
+                "island": arm.island,
+                "successes": arm.successes,
+                "failures": arm.failures,
+                "recent_reward": arm.recent_reward,
+                "temperature": self.templates[name].temperature
+                if name in self.templates
+                else None,
+                "invalid_responses": arm.invalid_responses,
+                "invalid_reasons": dict(self._invalid_reason_histograms.get(name, {})),
+            }
+            for name, arm in self.arms.items()
+        }
+        templates = {
+            name: {
+                "generation": genome.generation,
+                "history": list(genome.history),
+                "checklist": list(genome.checklist),
+            }
+            for name, genome in self.templates.items()
+        }
+        payload = {
+            "arms": arms,
+            "templates": templates,
+            "bandit": {
+                "linucb_alpha": self._linucb_alpha,
+            },
+        }
+        return payload
+
+    def export_telemetry(self, output_path: Path) -> None:
+        """Writes telemetry to disk for dashboards or analytics."""
+
+        payload = self.telemetry()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def register_invalid_response(self, arm_name: str, reason: str) -> None:
+        """Record that a prompt arm produced an invalid LLM response."""
+
+        arm = self.arms.get(arm_name)
+        if not arm:
+            return
+        arm.invalid_responses += 1.0
+        bucket = self._invalid_reason_histograms.setdefault(arm_name, {})
+        reason_key = reason[:160] if reason else "unknown"
+        bucket[reason_key] = int(bucket.get(reason_key, 0)) + 1
+        arm.recent_reward = 0.0
+        genome = self.templates.get(arm_name)
+        if genome:
+            note = f"Address invalid output ({reason_key})"
+            if note not in genome.checklist:
+                genome.checklist.append(note)
+        self._linucb_update(arm_name, -0.2)
+        self._linucb_alpha = min(self._alpha_max, self._linucb_alpha * 1.05)
+
+    def _ensure_linucb_state(self, arm_name: str) -> None:
+        if arm_name not in self._linucb_A_inv:
+            self._linucb_A_inv[arm_name] = self._identity_matrix(self._linucb_dim)
+            self._linucb_b[arm_name] = [0.0] * self._linucb_dim
+
+    def _context_features(self, arm_name: str, context: Mapping[str, object]) -> List[float]:
+        arm = self.arms.get(arm_name)
+        problem_id = str(context.get("problem_id", "")) if context else ""
+        problem_match = 1.0 if arm and arm.problem_id in {problem_id, "*"} else 0.0
+        failure_tags = context.get("failure_tags") or []
+        if isinstance(failure_tags, str):
+            failure_tags = [failure_tags]
+        if not isinstance(failure_tags, IterableABC):
+            failure_tags = []
+        failure_density = min(sum(1 for _ in failure_tags), 3) / 3.0
+        complexity_norm = float(context.get("complexity_norm", 0.0)) if context else 0.0
+        complexity_norm = max(0.0, min(1.0, complexity_norm))
+        invalid_density = float(context.get("invalid_density", 0.0)) if context else 0.0
+        invalid_density = max(0.0, min(1.0, invalid_density))
+        recent_reward = float(context.get("recent_reward", 0.0)) if context else 0.0
+        fewshot_hits = float(context.get("fewshot_hits", 0.0)) if context else 0.0
+        return [1.0, problem_match, failure_density, complexity_norm, invalid_density, recent_reward]
+
+    def _linucb_update(self, arm_name: str, reward: float) -> None:
+        features = self._last_features.get(arm_name)
+        if not features:
+            return
+        self._ensure_linucb_state(arm_name)
+        A_inv = self._linucb_A_inv[arm_name]
+        b_vec = self._linucb_b[arm_name]
+        Af = self._mat_vec_mul(A_inv, features)
+        denom = 1.0 + self._dot(features, Af)
+        if denom <= 0:
+            return
+        outer = self._outer(Af, Af)
+        scaled_outer = [[val / denom for val in row] for row in outer]
+        self._linucb_A_inv[arm_name] = self._matrix_sub(A_inv, scaled_outer)
+        self._linucb_b[arm_name] = [b + reward * f for b, f in zip(b_vec, features)]
+        self._linucb_alpha = max(self._alpha_min, self._linucb_alpha * 0.995)
+
+    @staticmethod
+    def _identity_matrix(dim: int) -> List[List[float]]:
+        return [[1.0 if i == j else 0.0 for j in range(dim)] for i in range(dim)]
+
+    @staticmethod
+    def _mat_vec_mul(matrix: Sequence[Sequence[float]], vector: Sequence[float]) -> List[float]:
+        return [sum(row[j] * vector[j] for j in range(len(vector))) for row in matrix]
+
+    @staticmethod
+    def _dot(lhs: Sequence[float], rhs: Sequence[float]) -> float:
+        return sum(a * b for a, b in zip(lhs, rhs))
+
+    @staticmethod
+    def _quad_form(matrix: Sequence[Sequence[float]], vector: Sequence[float]) -> float:
+        tmp = [sum(matrix[i][j] * vector[j] for j in range(len(vector))) for i in range(len(vector))]
+        return sum(vector[i] * tmp[i] for i in range(len(vector)))
+
+    @staticmethod
+    def _outer(lhs: Sequence[float], rhs: Sequence[float]) -> List[List[float]]:
+        return [[x * y for y in rhs] for x in lhs]
+
+    @staticmethod
+    def _matrix_sub(lhs: Sequence[Sequence[float]], rhs: Sequence[Sequence[float]]) -> List[List[float]]:
+        return [[lhs[i][j] - rhs[i][j] for j in range(len(lhs[i]))] for i in range(len(lhs))]

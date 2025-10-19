@@ -1,0 +1,179 @@
+{
+  "arms": {
+    "mutate.shortest_path.robust_first": {
+      "problem_id": "shortest_path",
+      "intent": "mutate",
+      "island": "robustness",
+      "successes": 1.0,
+      "failures": 1.0,
+      "recent_reward": 0.0,
+      "temperature": 0.7,
+      "invalid_responses": 1.0,
+      "invalid_reasons": {
+        "PromptValidationError": 1
+      }
+    },
+    "mutate.knapsack.robust_first": {
+      "problem_id": "knapsack",
+      "intent": "mutate",
+      "island": "robustness",
+      "successes": 1.0,
+      "failures": 1.0,
+      "recent_reward": 0.0,
+      "temperature": 0.7,
+      "invalid_responses": 1.0,
+      "invalid_reasons": {
+        "PromptValidationError": 1
+      }
+    },
+    "crossover.v1": {
+      "problem_id": "*",
+      "intent": "crossover",
+      "island": "crossover",
+      "successes": 1.0,
+      "failures": 1.0,
+      "recent_reward": 0.0,
+      "temperature": 0.7,
+      "invalid_responses": 0.0,
+      "invalid_reasons": {}
+    },
+    "mutate.perf_first": {
+      "problem_id": "sample_problem",
+      "intent": "mutate",
+      "island": "performance",
+      "successes": 1.0,
+      "failures": 1.0,
+      "recent_reward": 0.0,
+      "temperature": 0.7,
+      "invalid_responses": 0.0,
+      "invalid_reasons": {}
+    },
+    "mutate.robust_first": {
+      "problem_id": "sample_problem",
+      "intent": "mutate",
+      "island": "robustness",
+      "successes": 1.7631659431153497,
+      "failures": 1.2368340568846503,
+      "recent_reward": 0.7631659431153496,
+      "temperature": 0.6473668113769301,
+      "invalid_responses": 0.0,
+      "invalid_reasons": {}
+    },
+    "mutate.knapsack.perf_first": {
+      "problem_id": "knapsack",
+      "intent": "mutate",
+      "island": "performance",
+      "successes": 1.0,
+      "failures": 1.0,
+      "recent_reward": 0.0,
+      "temperature": 0.7,
+      "invalid_responses": 1.0,
+      "invalid_reasons": {
+        "PromptValidationError": 1
+      }
+    },
+    "repair.v1": {
+      "problem_id": "*",
+      "intent": "repair",
+      "island": "repair",
+      "successes": 3.245066273835378,
+      "failures": 1.6768968415433747,
+      "recent_reward": 0.7681343479283762,
+      "temperature": 0.21783289649699972,
+      "invalid_responses": 0.0,
+      "invalid_reasons": {}
+    },
+    "mutate.shortest_path.perf_first": {
+      "problem_id": "shortest_path",
+      "intent": "mutate",
+      "island": "performance",
+      "successes": 1.0,
+      "failures": 1.0,
+      "recent_reward": 0.0,
+      "temperature": 0.7,
+      "invalid_responses": 1.0,
+      "invalid_reasons": {
+        "PromptValidationError": 1
+      }
+    }
+  },
+  "templates": {
+    "mutate.shortest_path.robust_first": {
+      "generation": 0,
+      "history": [],
+      "checklist": [
+        "Report metrics for mutate.shortest_path.robust_first",
+        "Address invalid output (PromptValidationError)"
+      ]
+    },
+    "mutate.knapsack.robust_first": {
+      "generation": 0,
+      "history": [],
+      "checklist": [
+        "Report metrics for mutate.knapsack.robust_first",
+        "Address invalid output (PromptValidationError)"
+      ]
+    },
+    "crossover.v1": {
+      "generation": 0,
+      "history": [],
+      "checklist": [
+        "Report metrics for crossover.v1"
+      ]
+    },
+    "mutate.perf_first": {
+      "generation": 0,
+      "history": [],
+      "checklist": [
+        "Report metrics for mutate.perf_first"
+      ]
+    },
+    "mutate.robust_first": {
+      "generation": 1,
+      "history": [
+        0.7631659431153496
+      ],
+      "checklist": [
+        "Report metrics for mutate.robust_first",
+        "Investigate L2_fail"
+      ]
+    },
+    "mutate.knapsack.perf_first": {
+      "generation": 0,
+      "history": [],
+      "checklist": [
+        "Report metrics for mutate.knapsack.perf_first",
+        "Address invalid output (PromptValidationError)"
+      ]
+    },
+    "repair.v1": {
+      "generation": 9,
+      "history": [
+        0.767864311207555,
+        0.7636731189826446,
+        0.7680006813972161,
+        0.7687938993618387,
+        0.768373615995128,
+        0.7687014803007933,
+        0.768567770735238,
+        0.7687262916062105,
+        0.7681343479283762
+      ],
+      "checklist": [
+        "Report metrics for repair.v1",
+        "Investigate L2_fail"
+      ]
+    },
+    "mutate.shortest_path.perf_first": {
+      "generation": 0,
+      "history": [],
+      "checklist": [
+        "Report metrics for mutate.shortest_path.perf_first",
+        "Address invalid output (PromptValidationError)"
+      ]
+    }
+  },
+  "bandit": {
+    "linucb_alpha": 0.8198270802536581
+  }
+}

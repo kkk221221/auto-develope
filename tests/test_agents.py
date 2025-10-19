@@ -1,0 +1,190 @@
+from __future__ import annotations
+
+import json
+from typing import Callable
+
+import pytest
+
+from orchestrator.agents import LLMApiAgentAdapter, LLMApiAgentError, _NoopRateLimiter
+from orchestrator.prompt_policy import PromptBandit, PromptMaterialization
+from orchestrator import fewshot
+from orchestrator.fewshot import (
+    FEWSHOT_ROOT,
+    FewShotExample,
+    append_example as append_fewshot_example,
+    retrieve_examples,
+)
+
+
+def _fake_completion_factory(payload: dict[str, object]) -> Callable[[PromptMaterialization], str]:
+    def _complete(_: PromptMaterialization) -> str:
+        return json.dumps(payload)
+
+    return _complete
+
+
+def test_llm_api_adapter_parses_search_replace_payload() -> None:
+    payload = {
+        "version": 1,
+        "patches": [
+            {
+                "diff_type": "sr",
+                "payload": {
+                    "search": "EVOLVE", "replace": "def solve():\n    return 1"
+                },
+                "file": "solutions/workdir/sample_solution.py",
+            }
+        ],
+        "telemetry_tags": ["explore"],
+    }
+    adapter = LLMApiAgentAdapter(
+        model="test-model",
+        completion_factory=_fake_completion_factory(payload),
+        rate_limiter=_NoopRateLimiter(),
+    )
+    prompt = PromptMaterialization(
+        name="mutate.perf_first",
+        backend="flash",
+        content="instructions",
+        generation=0,
+        checklist=[],
+    )
+    result = adapter.generate(prompt)
+    assert "def solve" in result.snippet
+    assert result.metadata["file"] == "solutions/workdir/sample_solution.py"
+    assert result.metadata["telemetry"] == ["explore"]
+    assert result.metadata["payload_version"] == 1
+    assert "raw_response" in result.metadata
+
+
+def test_llm_api_adapter_raises_on_invalid_output() -> None:
+    adapter = LLMApiAgentAdapter(
+        model="test-model",
+        completion_factory=_fake_completion_factory({"version": 1, "patches": []}),
+        rate_limiter=_NoopRateLimiter(),
+    )
+    prompt = PromptMaterialization(
+        name="mutate.robust_first",
+        backend="flash",
+        content="",
+        generation=0,
+        checklist=[],
+    )
+    try:
+        adapter.generate(prompt)
+    except LLMApiAgentError as exc:
+        assert "SEARCH/REPLACE" in str(exc)
+    else:  # pragma: no cover - safety net
+        raise AssertionError("Expected LLMApiAgentError")
+
+
+def test_llm_api_adapter_retries_on_timeout() -> None:
+    payload = {
+        "version": 1,
+        "patches": [
+            {
+                "diff_type": "sr",
+                "payload": "def solve():\n    return 2",
+                "file": "solutions/workdir/sample_solution.py",
+            }
+        ]
+    }
+    calls = {"count": 0}
+
+    def _completion(_: PromptMaterialization) -> str:
+        if calls["count"] == 0:
+            calls["count"] += 1
+            raise TimeoutError()
+        calls["count"] += 1
+        return json.dumps(payload)
+
+    adapter = LLMApiAgentAdapter(
+        model="test-model",
+        completion_factory=_completion,
+        rate_limiter=_NoopRateLimiter(),
+        max_retries=1,
+    )
+    prompt = PromptMaterialization(
+        name="mutate.perf_first",
+        backend="flash",
+        content="instructions",
+        generation=0,
+        checklist=[],
+    )
+    result = adapter.generate(prompt)
+    assert result.snippet.startswith("def solve")
+    assert calls["count"] == 2
+
+
+def test_llm_api_adapter_extracts_json_from_code_fence() -> None:
+    fenced_payload = """```json
+    {"version": 1, "patches": [{"diff_type": "sr", "payload": "x"}]}
+    ```"""
+
+    adapter = LLMApiAgentAdapter(
+        model="test-model",
+        completion_factory=_fake_completion_factory({"patches": []}),
+        rate_limiter=_NoopRateLimiter(),
+    )
+
+    extracted = adapter._extract_json_blob(fenced_payload)
+    assert extracted == '{"version": 1, "patches": [{"diff_type": "sr", "payload": "x"}]}'
+
+
+def test_llm_api_adapter_rejects_missing_version() -> None:
+    adapter = LLMApiAgentAdapter(
+        model="test-model",
+        completion_factory=_fake_completion_factory({"patches": []}),
+        rate_limiter=_NoopRateLimiter(),
+    )
+    prompt = PromptMaterialization(
+        name="mutate.robust_first",
+        backend="flash",
+        content="",
+        generation=0,
+        checklist=[],
+    )
+    with pytest.raises(LLMApiAgentError):
+        adapter.generate(prompt)
+
+
+def test_prompt_bandit_tracks_invalid_responses(tmp_path) -> None:
+    bandit = PromptBandit.from_directory("agents/prompts")
+    arm_name, _ = bandit.pick_prompt()
+    bandit.register_invalid_response(arm_name, "schema_error")
+    telemetry = bandit.telemetry()
+    assert telemetry["arms"][arm_name]["invalid_responses"] == 1.0
+    assert telemetry["arms"][arm_name]["invalid_reasons"]["schema_error"] == 1
+
+
+def test_fewshot_append_and_retrieve(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(fewshot, "FEWSHOT_ROOT", tmp_path)
+    monkeypatch.setattr(fewshot, "MAX_FEWSHOT_PER_PROBLEM", 3)
+    example = FewShotExample(
+        search="def solve(x):\n    return x",
+        replace="def solve(x):\n    return x + 1",
+        tags=["L1"],
+        intent="mutate",
+        success=True,
+    )
+    append_fewshot_example("sample_problem", example)
+    for _ in range(5):
+        append_fewshot_example(
+            "sample_problem",
+            FewShotExample(
+                search="def solve(x):\n    return x",
+                replace="def solve(x):\n    return x - 1",
+                tags=[],
+                intent="mutate",
+                success=False,
+            ),
+        )
+    append_fewshot_example("sample_problem", example)
+    path = fewshot.FEWSHOT_ROOT / "sample_problem.jsonl"
+    assert path.exists()
+    with path.open("r", encoding="utf-8") as handle:
+        lines = handle.readlines()
+    assert len(lines) <= 3
+    examples = retrieve_examples("sample_problem", "def solve(x):\n    return x * 2", ["L1"])
+    assert examples
+    assert any(item["replace"].strip().endswith("x + 1") for item in examples)

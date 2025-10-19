@@ -1,0 +1,2176 @@
+{
+  "archive": {
+    "candidates": {
+      "272f5d26cd714583b9dfdef27637da7d": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 337.5233390019275,
+            "runtime_p50": 336.33833000203595,
+            "runtime_p90": 342.68816700205207
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:13:04.916968+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:13:16.442670+00:00",
+        "generation": 7,
+        "id": "272f5d26cd714583b9dfdef27637da7d",
+        "lineage_commit": "37cefee32ec65bf9035a01473d0064ed1bbc2438",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.4268816700205207,
+          "robustness": 1.0,
+          "runtime_ms": 337.5233390019275
+        },
+        "novelty_score": 0.022352577289260166,
+        "parents": [
+          "4fdafcd6f65b40a59c1f212defbd48d6"
+        ],
+        "pareto_rank": 1,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "37cefee32ec65bf9035a01473d0064ed1bbc2438",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/272f5d26cd714583b9dfdef27637da7d/sample_solution.py",
+        "status": "failed"
+      },
+      "4ac3d5f257804e8e9ab2e1859d30b17e": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 374.9394771992229,
+            "runtime_p50": 372.8971250093309,
+            "runtime_p90": 383.32597199769225
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:09:06.072906+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:09:28.945404+00:00",
+        "generation": 0,
+        "id": "4ac3d5f257804e8e9ab2e1859d30b17e",
+        "lineage_commit": "fa79236743b6242ac885de6ae4043197c1a32d01",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.8332597199769225,
+          "robustness": 1.0,
+          "runtime_ms": 374.9394771992229
+        },
+        "novelty_score": 1.0,
+        "parents": [],
+        "pareto_rank": 4,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "mutate",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "robust_first",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "fa79236743b6242ac885de6ae4043197c1a32d01",
+            "intent": "mutate",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\"]}",
+            "strategy": "llm_api",
+            "telemetry": [
+              "mutate.robust_first"
+            ]
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "mutate.robust_first",
+        "source_path": ".artifacts/candidates/sample_problem/4ac3d5f257804e8e9ab2e1859d30b17e/sample_solution.py",
+        "status": "failed"
+      },
+      "4fdafcd6f65b40a59c1f212defbd48d6": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 336.6718136006966,
+            "runtime_p50": 335.81006799067836,
+            "runtime_p90": 341.5725810045842
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:12:45.846248+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:12:57.061889+00:00",
+        "generation": 6,
+        "id": "4fdafcd6f65b40a59c1f212defbd48d6",
+        "lineage_commit": "26ce6d9175cd42e3d8a93761ce753ffcc42b037a",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.415725810045842,
+          "robustness": 1.0,
+          "runtime_ms": 336.6718136006966
+        },
+        "novelty_score": 0.043217774715963504,
+        "parents": [
+          "99c62b5314664bb6bb9a95e4431f974a"
+        ],
+        "pareto_rank": 0,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "26ce6d9175cd42e3d8a93761ce753ffcc42b037a",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/4fdafcd6f65b40a59c1f212defbd48d6/sample_solution.py",
+        "status": "failed"
+      },
+      "63d353d069454db896f4f22241c7ece4": {
+        "behavior": {
+          "coverage_bits": [
+            9,
+            28,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 342.0585646003019,
+            "runtime_p50": 342.4929790053284,
+            "runtime_p90": 344.12560900091194
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:09:35.516481+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:09:47.681703+00:00",
+        "generation": 1,
+        "id": "63d353d069454db896f4f22241c7ece4",
+        "lineage_commit": "8a725d48a8c649f91620534f867e22cecc59e271",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 9.0,
+          "llm_style": 0.898611111111111,
+          "loc": 28,
+          "memory_peak_mb": 3.4412560900091194,
+          "robustness": 1.0,
+          "runtime_ms": 342.0585646003019
+        },
+        "novelty_score": 0.88769658731201,
+        "parents": [
+          "4ac3d5f257804e8e9ab2e1859d30b17e"
+        ],
+        "pareto_rank": 2,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "8a725d48a8c649f91620534f867e22cecc59e271",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"repair.v1\"]}",
+            "strategy": "llm_api",
+            "telemetry": [
+              "repair.v1"
+            ]
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/63d353d069454db896f4f22241c7ece4/sample_solution.py",
+        "status": "failed"
+      },
+      "99c62b5314664bb6bb9a95e4431f974a": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 338.7657368031796,
+            "runtime_p50": 338.4122740098974,
+            "runtime_p90": 341.7175259965006
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:10:44.191192+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:12:39.161912+00:00",
+        "generation": 5,
+        "id": "99c62b5314664bb6bb9a95e4431f974a",
+        "lineage_commit": "1e3caca6de742c8d7439855a3209953de54f134f",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.4171752599650063,
+          "robustness": 1.0,
+          "runtime_ms": 338.7657368031796
+        },
+        "novelty_score": 0.20166817005995458,
+        "parents": [
+          "e883ab2ffe0044a79974d006f6da9660"
+        ],
+        "pareto_rank": 1,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "1e3caca6de742c8d7439855a3209953de54f134f",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/99c62b5314664bb6bb9a95e4431f974a/sample_solution.py",
+        "status": "failed"
+      },
+      "a52f49a4ae97476aae9d1e49cbfa5bf0": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 341.1720498028444,
+            "runtime_p50": 338.6900580080692,
+            "runtime_p90": 349.4996909867041
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:10:05.834678+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:10:17.127982+00:00",
+        "generation": 3,
+        "id": "a52f49a4ae97476aae9d1e49cbfa5bf0",
+        "lineage_commit": "b80edce3be947694475e2f145d1463041629ea97",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.494996909867041,
+          "robustness": 1.0,
+          "runtime_ms": 341.1720498028444
+        },
+        "novelty_score": 0.3244797013622644,
+        "parents": [
+          "ed99bec6753b4e0781ca07a125af0e47"
+        ],
+        "pareto_rank": 3,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "b80edce3be947694475e2f145d1463041629ea97",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/a52f49a4ae97476aae9d1e49cbfa5bf0/sample_solution.py",
+        "status": "failed"
+      },
+      "ba04be54a29a4cdebda76b2e606edc05": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 340.3065548016457,
+            "runtime_p50": 341.2655749998521,
+            "runtime_p90": 344.43608099536505
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:13:42.359803+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:13:57.393058+00:00",
+        "generation": 9,
+        "id": "ba04be54a29a4cdebda76b2e606edc05",
+        "lineage_commit": "afb867756c95019c12b1039fbf1fadf3ea6677d0",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.4443608099536505,
+          "robustness": 1.0,
+          "runtime_ms": 340.3065548016457
+        },
+        "novelty_score": 0.007413586964230457,
+        "parents": [
+          "f83fb48542054f2abdd042901de2b140"
+        ],
+        "pareto_rank": 2,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "afb867756c95019c12b1039fbf1fadf3ea6677d0",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/ba04be54a29a4cdebda76b2e606edc05/sample_solution.py",
+        "status": "failed"
+      },
+      "e883ab2ffe0044a79974d006f6da9660": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 336.08518020191696,
+            "runtime_p50": 333.54211499681696,
+            "runtime_p90": 347.1889780048514
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:10:24.710103+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:10:36.807695+00:00",
+        "generation": 4,
+        "id": "e883ab2ffe0044a79974d006f6da9660",
+        "lineage_commit": "f5b0a40ff5a184fc359729394d06eb4bfc043ce4",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.471889780048514,
+          "robustness": 1.0,
+          "runtime_ms": 336.08518020191696
+        },
+        "novelty_score": 0.2576232658860989,
+        "parents": [
+          "a52f49a4ae97476aae9d1e49cbfa5bf0"
+        ],
+        "pareto_rank": 0,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "f5b0a40ff5a184fc359729394d06eb4bfc043ce4",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/e883ab2ffe0044a79974d006f6da9660/sample_solution.py",
+        "status": "failed"
+      },
+      "ed99bec6753b4e0781ca07a125af0e47": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 371.1564390017884,
+            "runtime_p50": 374.51538001187146,
+            "runtime_p90": 387.6810150104575
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:09:54.046808+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:09:58.860337+00:00",
+        "generation": 2,
+        "id": "ed99bec6753b4e0781ca07a125af0e47",
+        "lineage_commit": "8eb34f26866a5262a2516b95c62f78a12c4cd9ad",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.876810150104575,
+          "robustness": 1.0,
+          "runtime_ms": 371.1564390017884
+        },
+        "novelty_score": 0.4442438003395381,
+        "parents": [
+          "63d353d069454db896f4f22241c7ece4"
+        ],
+        "pareto_rank": 4,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "8eb34f26866a5262a2516b95c62f78a12c4cd9ad",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/ed99bec6753b4e0781ca07a125af0e47/sample_solution.py",
+        "status": "failed"
+      },
+      "f83fb48542054f2abdd042901de2b140": {
+        "behavior": {
+          "coverage_bits": [
+            11,
+            35,
+            128
+          ],
+          "hotspots": {
+            "runtime_mean": 336.51416799693834,
+            "runtime_p50": 334.4178679981269,
+            "runtime_p90": 343.73189498728607
+          },
+          "output_signature": "acc:1.000/rob:1.000"
+        },
+        "created_at": "2025-10-18T17:13:23.194276+00:00",
+        "crowding_distance": Infinity,
+        "eval_passes": [
+          "L0",
+          "L1"
+        ],
+        "evaluated_at": "2025-10-18T17:13:35.049234+00:00",
+        "generation": 8,
+        "id": "f83fb48542054f2abdd042901de2b140",
+        "lineage_commit": "3bb35381d5d129c90c45d1db08108aa50240056b",
+        "llm_backend": "flash",
+        "metrics": {
+          "accuracy": 1.0,
+          "cyclomatic": 11.0,
+          "llm_style": 0.8981981981981981,
+          "loc": 35,
+          "memory_peak_mb": 3.4373189498728607,
+          "robustness": 1.0,
+          "runtime_ms": 336.51416799693834
+        },
+        "novelty_score": 0.005006390637675711,
+        "parents": [
+          "272f5d26cd714583b9dfdef27637da7d"
+        ],
+        "pareto_rank": 0,
+        "patch_payload": {
+          "diff_type": "sr",
+          "intent": "repair",
+          "metadata": {
+            "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+            "arm": "v1",
+            "file": "solutions/workdir/sample_solution.py",
+            "git_commit": "3bb35381d5d129c90c45d1db08108aa50240056b",
+            "intent": "repair",
+            "payload_version": 1,
+            "problem_id": "sample_problem",
+            "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+            "strategy": "llm_api",
+            "telemetry": []
+          },
+          "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "problem_id": "sample_problem"
+        },
+        "problem_id": "sample_problem",
+        "prompt_arm": "repair.v1",
+        "source_path": ".artifacts/candidates/sample_problem/f83fb48542054f2abdd042901de2b140/sample_solution.py",
+        "status": "failed"
+      }
+    },
+    "state": {
+      "map_elites_cells": {
+        "2,7": "4ac3d5f257804e8e9ab2e1859d30b17e"
+      },
+      "pareto_front": [
+        "e883ab2ffe0044a79974d006f6da9660",
+        "4fdafcd6f65b40a59c1f212defbd48d6",
+        "f83fb48542054f2abdd042901de2b140"
+      ]
+    }
+  },
+  "cache": {
+    "environment": "local",
+    "stats": {
+      "hit_rate": 0.0,
+      "hits": 0.0,
+      "lookups": 30.0
+    }
+  },
+  "pending_candidates": [
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:14:05.544759+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 10,
+      "id": "3978c7dae7814c22b98c74b33b73bf20",
+      "lineage_commit": "a08e438018917f192e8710728c10d976fb94c0e0",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "ba04be54a29a4cdebda76b2e606edc05"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "repair",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "v1",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "a08e438018917f192e8710728c10d976fb94c0e0",
+          "intent": "repair",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+          "strategy": "llm_api",
+          "telemetry": []
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "repair.v1",
+      "source_path": ".artifacts/candidates/sample_problem/3978c7dae7814c22b98c74b33b73bf20/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:09:12.134137+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 0,
+      "id": "083ec6973b534062b9e13382413d5b05",
+      "lineage_commit": "b8fb9c21fe5ba83164c2dcfa4a412910a63ae3d3",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "arm": "robust_first",
+          "git_commit": "b8fb9c21fe5ba83164c2dcfa4a412910a63ae3d3",
+          "intent": "mutate",
+          "problem_id": "shortest_path",
+          "prompt_generation": 0,
+          "strategy": "template_mutation"
+        },
+        "payload": "def solve(samples: Iterable[Dict[str, object]]) -> float:\n    total = 0.0\n    count = 0\n    for sample in samples:\n        total += _safe_shortest(sample)\n        count += 1\n    return total / count if count else 0.0\n\n\ndef _safe_shortest(sample: Dict[str, object]) -> float:\n    nodes = int(sample.get(\"nodes\", 0))\n    graph: Dict[int, List[Tuple[int, float]]] = {i: [] for i in range(nodes)}\n    for edge in sample.get(\"edges\", []):\n        try:\n            u, v, w = edge\n        except (TypeError, ValueError):\n            continue\n        u, v = int(u), int(v)\n        if u not in graph or v not in graph:\n            continue\n        graph[u].append((v, max(1.0, float(w))))\n    distance = _dijkstra_guarded(graph, int(sample.get(\"source\", 0)), int(sample.get(\"target\", nodes - 1)))\n    if distance == float(\"inf\"):\n        return float(nodes * 10)\n    return distance\n\n\ndef _dijkstra_guarded(graph: Dict[int, List[Tuple[int, float]]], source: int, target: int) -> float:\n    distances = {node: float(\"inf\") for node in graph}\n    distances[source] = 0.0\n    queue: List[Tuple[float, int]] = [(0.0, source)]\n    while queue:\n        current, node = heapq.heappop(queue)\n        if current > distances[node]:\n            continue\n        if node == target:\n            return current\n        for neighbour, weight in graph.get(node, []):\n            candidate = current + weight\n            if candidate < distances.get(neighbour, float(\"inf\")):\n                distances[neighbour] = candidate\n                heapq.heappush(queue, (candidate, neighbour))\n    return float(\"inf\")",
+        "problem_id": "shortest_path"
+      },
+      "problem_id": "shortest_path",
+      "prompt_arm": "mutate.shortest_path.robust_first",
+      "source_path": ".artifacts/candidates/shortest_path/083ec6973b534062b9e13382413d5b05/shortest_path_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:09:16.279773+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 0,
+      "id": "e286787bfa13498f8fad8cd2af7bc97f",
+      "lineage_commit": "d5d28731956257f24288f0011eac7ee77f380c07",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "arm": "perf_first",
+          "git_commit": "d5d28731956257f24288f0011eac7ee77f380c07",
+          "intent": "mutate",
+          "problem_id": "knapsack",
+          "prompt_generation": 0,
+          "strategy": "template_mutation"
+        },
+        "payload": "def solve(samples: Iterable[Dict[str, object]]) -> float:\n    total = 0.0\n    count = 0\n    for sample in samples:\n        total += float(_dense_dp(sample))\n        count += 1\n    return total / count if count else 0.0\n\n\ndef _dense_dp(sample: Dict[str, object]) -> int:\n    capacity = int(sample.get(\"capacity\", 0))\n    items = _normalise_items(sample.get(\"items\", []))\n    dp = [0] * (capacity + 1)\n    for value, weight in items:\n        for current in range(weight, capacity + 1):\n            candidate = dp[current - weight] + value\n            if candidate > dp[current]:\n                dp[current] = candidate\n    return dp[capacity]\n\n\ndef _normalise_items(raw_items: Iterable[Tuple[int, int]]) -> List[Tuple[int, int]]:\n    cleaned: List[Tuple[int, int]] = []\n    for item in raw_items:\n        try:\n            value, weight = item\n        except (TypeError, ValueError):\n            continue\n        value = int(value)\n        weight = int(weight)\n        if weight <= 0:\n            continue\n        cleaned.append((max(0, value), weight))\n    cleaned.sort(key=lambda item: (item[1], -item[0]))\n    return cleaned",
+        "problem_id": "knapsack"
+      },
+      "problem_id": "knapsack",
+      "prompt_arm": "mutate.knapsack.perf_first",
+      "source_path": ".artifacts/candidates/knapsack/e286787bfa13498f8fad8cd2af7bc97f/knapsack_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:09:24.000875+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 0,
+      "id": "269263e7a0a84818be99183c597c4182",
+      "lineage_commit": "9ba8973cf918303a26dea0fe5ef47907a707d6ac",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "9ba8973cf918303a26dea0fe5ef47907a707d6ac",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    metrics = {\\n        'malformed_pairs': malformed_pairs,\\n        'non_integer_values': non_integer_values,\\n        'valid_pairs': count\\n    }\\n    logging.info(f\\\"Robustness metrics: {metrics}\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[]}",
+          "strategy": "llm_api",
+          "telemetry": []
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    metrics = {\n        'malformed_pairs': malformed_pairs,\n        'non_integer_values': non_integer_values,\n        'valid_pairs': count\n    }\n    logging.info(f\"Robustness metrics: {metrics}\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/269263e7a0a84818be99183c597c4182/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:09:43.129748+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 1,
+      "id": "78cfe94067e54e3eb22251ab4e6d02f3",
+      "lineage_commit": "6ee0b548669637f9d68d6627303dd59da1e67535",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "4ac3d5f257804e8e9ab2e1859d30b17e"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "6ee0b548669637f9d68d6627303dd59da1e67535",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/78cfe94067e54e3eb22251ab4e6d02f3/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [
+          28
+        ],
+        "hotspots": {
+          "blend_ratio": 1.0
+        },
+        "output_signature": "63d353|4ac3d5"
+      },
+      "created_at": "2025-10-18T17:09:54.065079+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 2,
+      "id": "5675a97d34a14006b05660579978b0b6",
+      "lineage_commit": "1b6c648e0fc790cfe1db755fa4eda3e1c39a59c0",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "63d353d069454db896f4f22241c7ece4",
+        "4ac3d5f257804e8e9ab2e1859d30b17e"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "unified",
+        "metadata": {
+          "conflicts": [],
+          "git_commit": "1b6c648e0fc790cfe1db755fa4eda3e1c39a59c0",
+          "notes": [
+            "Merged solve using 4 statements from parent A and 5 from parent B"
+          ],
+          "plan": {
+            "conflicts": [],
+            "description": "Merged solve using 4 statements from parent A and 5 from parent B",
+            "fragments": 1,
+            "parents": [
+              "63d353d069454db896f4f22241c7ece4",
+              "4ac3d5f257804e8e9ab2e1859d30b17e"
+            ],
+            "strategy": "ast_mix"
+          },
+          "strategy": "ast_mix"
+        },
+        "payload": "--- 63d353d069454db896f4f22241c7ece4.py\n+++ crossover.py\n@@ -11,22 +11,26 @@\n     count = 0\n     malformed_pairs = 0\n     non_integer_values = 0\n-    for i, pair in enumerate(pairs):\n-        if not isinstance(pair, tuple) or len(pair) != 2:\n-            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n-            malformed_pairs += 1\n-            continue\n-        a, b = pair\n-        if not isinstance(a, int) or not isinstance(b, int):\n-            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n-            non_integer_values += 1\n-            continue\n-        total += a + b\n-        count += 1\n+    try:\n+        for i, pair in enumerate(pairs):\n+            if not isinstance(pair, tuple) or len(pair) != 2:\n+                logging.warning(f'Item at index {i} is not a tuple of 2 elements: {pair}')\n+                malformed_pairs += 1\n+                continue\n+            a, b = pair\n+            if not isinstance(a, int) or not isinstance(b, int):\n+                logging.warning(f'Item at index {i} contains non-integer values: {pair}')\n+                non_integer_values += 1\n+                continue\n+            total += a + b\n+            count += 1\n+    except (TypeError, ValueError) as e:\n+        logging.error(f'Invalid input type provided: {e}')\n+        return 0.0\n     if malformed_pairs > 0:\n-        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n+        logging.info(f'Found {malformed_pairs} malformed pairs.')\n     if non_integer_values > 0:\n-        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n+        logging.info(f'Found {non_integer_values} pairs with non-integer values.')\n     if count == 0:\n         return 0.0\n     return total / count\n"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "crossover.ast_mix",
+      "source_path": ".artifacts/candidates/sample_problem/5675a97d34a14006b05660579978b0b6/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:10:12.658176+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 2,
+      "id": "239e059c58dc498f9efa3958ca019046",
+      "lineage_commit": "cdbec62186191c3a1c06968b1a4f1b3a41ca3a7d",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "4ac3d5f257804e8e9ab2e1859d30b17e",
+        "63d353d069454db896f4f22241c7ece4"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "cdbec62186191c3a1c06968b1a4f1b3a41ca3a7d",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/239e059c58dc498f9efa3958ca019046/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:10:32.141170+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 2,
+      "id": "9db956854b664ca68e49e3966af855b0",
+      "lineage_commit": "2bf558bf3dc11e2ef2a801effb2682b194bf2a91",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "4ac3d5f257804e8e9ab2e1859d30b17e",
+        "63d353d069454db896f4f22241c7ece4"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "2bf558bf3dc11e2ef2a801effb2682b194bf2a91",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/9db956854b664ca68e49e3966af855b0/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:10:54.301200+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 2,
+      "id": "d5d0fc2185d64280a3d2eb5e797c9009",
+      "lineage_commit": "04c8693486401929b678b1703061e6e168400bfa",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "4ac3d5f257804e8e9ab2e1859d30b17e",
+        "63d353d069454db896f4f22241c7ece4"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "04c8693486401929b678b1703061e6e168400bfa",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/d5d0fc2185d64280a3d2eb5e797c9009/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:12:52.678168+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 5,
+      "id": "46ca372638084701ab120fd23f993fba",
+      "lineage_commit": "3f7fac5f960bd5cb8eb628b6813a5ae2b273d598",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "a52f49a4ae97476aae9d1e49cbfa5bf0",
+        "e883ab2ffe0044a79974d006f6da9660"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "3f7fac5f960bd5cb8eb628b6813a5ae2b273d598",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/46ca372638084701ab120fd23f993fba/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:13:12.036440+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 5,
+      "id": "113f5cfd6d8f4b259b82b1f84310a104",
+      "lineage_commit": "594e904765ba887450a3ad97caabe20854cf5061",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "a52f49a4ae97476aae9d1e49cbfa5bf0",
+        "e883ab2ffe0044a79974d006f6da9660"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "594e904765ba887450a3ad97caabe20854cf5061",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/113f5cfd6d8f4b259b82b1f84310a104/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:13:30.616945+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 5,
+      "id": "e6234b3ce9de474cafd4eed1a85464a6",
+      "lineage_commit": "5b84b040af136f7a35dda699ea88945e4d96f325",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "a52f49a4ae97476aae9d1e49cbfa5bf0",
+        "e883ab2ffe0044a79974d006f6da9660"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "5b84b040af136f7a35dda699ea88945e4d96f325",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/e6234b3ce9de474cafd4eed1a85464a6/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:13:52.957278+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 5,
+      "id": "e5010655a37c440f9db1a7289b4a63f6",
+      "lineage_commit": "3244d3728777a4151f29334bcc2aee2967ca0024",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "a52f49a4ae97476aae9d1e49cbfa5bf0",
+        "e883ab2ffe0044a79974d006f6da9660"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "3244d3728777a4151f29334bcc2aee2967ca0024",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/e5010655a37c440f9db1a7289b4a63f6/sample_solution.py",
+      "status": "pending"
+    },
+    {
+      "behavior": {
+        "coverage_bits": [],
+        "hotspots": {},
+        "output_signature": ""
+      },
+      "created_at": "2025-10-18T17:14:14.852202+00:00",
+      "crowding_distance": 0.0,
+      "eval_passes": [],
+      "evaluated_at": null,
+      "generation": 5,
+      "id": "691fcc3b144044a79498835155d107db",
+      "lineage_commit": "03f6ec1d33dddcfa68c8774470c1d9be6a6097f4",
+      "llm_backend": "flash",
+      "metrics": {
+        "accuracy": 0.0,
+        "cyclomatic": 0.0,
+        "llm_style": 0.0,
+        "loc": 0,
+        "memory_peak_mb": 0.0,
+        "robustness": 0.0,
+        "runtime_ms": 0.0
+      },
+      "novelty_score": 0.0,
+      "parents": [
+        "a52f49a4ae97476aae9d1e49cbfa5bf0",
+        "e883ab2ffe0044a79974d006f6da9660"
+      ],
+      "pareto_rank": 0,
+      "patch_payload": {
+        "diff_type": "sr",
+        "intent": "mutate",
+        "metadata": {
+          "anchor": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    for i, pair in enumerate(pairs):\n        if not isinstance(pair, tuple) or len(pair) != 2:\n            logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n            malformed_pairs += 1\n            continue\n        a, b = pair\n        if not isinstance(a, int) or not isinstance(b, int):\n            logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n            non_integer_values += 1\n            continue\n        total += a + b\n        count += 1\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+          "arm": "robust_first",
+          "file": "solutions/workdir/sample_solution.py",
+          "git_commit": "03f6ec1d33dddcfa68c8774470c1d9be6a6097f4",
+          "intent": "mutate",
+          "payload_version": 1,
+          "problem_id": "sample_problem",
+          "raw_response": "{\"version\":1,\"patches\":[{\"diff_type\":\"sr\",\"file\":\"solutions/workdir/sample_solution.py\",\"payload\":{\"search\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    for i, pair in enumerate(pairs):\\n        if not isinstance(pair, tuple) or len(pair) != 2:\\n            logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n            malformed_pairs += 1\\n            continue\\n        a, b = pair\\n        if not isinstance(a, int) or not isinstance(b, int):\\n            logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n            non_integer_values += 1\\n            continue\\n        total += a + b\\n        count += 1\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\",\"replace\":\"def solve(pairs: Iterable[Tuple[int, int]]) -> float:\\n    total = 0\\n    count = 0\\n    malformed_pairs = 0\\n    non_integer_values = 0\\n    if pairs is None:\\n        logging.error(\\\"Input pairs is None\\\")\\n        return 0.0\\n    try:\\n        for i, pair in enumerate(pairs):\\n            if not isinstance(pair, tuple) or len(pair) != 2:\\n                logging.warning(f\\\"Item at index {i} is not a tuple of 2 elements: {pair}\\\")\\n                malformed_pairs += 1\\n                continue\\n            a, b = pair\\n            if not isinstance(a, int) or not isinstance(b, int):\\n                logging.warning(f\\\"Item at index {i} contains non-integer values: {pair}\\\")\\n                non_integer_values += 1\\n                continue\\n            total += a + b\\n            count += 1\\n    except (TypeError, ValueError) as e:\\n        logging.error(f\\\"Invalid input type provided: {e}\\\")\\n        return 0.0\\n    if malformed_pairs > 0:\\n        logging.info(f\\\"Found {malformed_pairs} malformed pairs.\\\")\\n    if non_integer_values > 0:\\n        logging.info(f\\\"Found {non_integer_values} pairs with non-integer values.\\\")\\n    if count == 0:\\n        return 0.0\\n    return total / count\"}}],\"telemetry_tags\":[\"mutate.robust_first\",\"L2_fail\"]}",
+          "strategy": "llm_api",
+          "telemetry": [
+            "mutate.robust_first",
+            "L2_fail"
+          ]
+        },
+        "payload": "def solve(pairs: Iterable[Tuple[int, int]]) -> float:\n    total = 0\n    count = 0\n    malformed_pairs = 0\n    non_integer_values = 0\n    if pairs is None:\n        logging.error(\"Input pairs is None\")\n        return 0.0\n    try:\n        for i, pair in enumerate(pairs):\n            if not isinstance(pair, tuple) or len(pair) != 2:\n                logging.warning(f\"Item at index {i} is not a tuple of 2 elements: {pair}\")\n                malformed_pairs += 1\n                continue\n            a, b = pair\n            if not isinstance(a, int) or not isinstance(b, int):\n                logging.warning(f\"Item at index {i} contains non-integer values: {pair}\")\n                non_integer_values += 1\n                continue\n            total += a + b\n            count += 1\n    except (TypeError, ValueError) as e:\n        logging.error(f\"Invalid input type provided: {e}\")\n        return 0.0\n    if malformed_pairs > 0:\n        logging.info(f\"Found {malformed_pairs} malformed pairs.\")\n    if non_integer_values > 0:\n        logging.info(f\"Found {non_integer_values} pairs with non-integer values.\")\n    if count == 0:\n        return 0.0\n    return total / count",
+        "problem_id": "sample_problem"
+      },
+      "problem_id": "sample_problem",
+      "prompt_arm": "mutate.robust_first",
+      "source_path": ".artifacts/candidates/sample_problem/691fcc3b144044a79498835155d107db/sample_solution.py",
+      "status": "pending"
+    }
+  ],
+  "prompt": {
+    "arms": {
+      "crossover.v1": {
+        "failures": 1.0,
+        "horizon_generations": 3,
+        "intent": "crossover",
+        "invalid_reasons": {},
+        "invalid_responses": 0.0,
+        "island": "crossover",
+        "name": "crossover.v1",
+        "problem_id": "*",
+        "recent_reward": 0.0,
+        "successes": 1.0,
+        "template_path": "agents/prompts/crossover.v1.md"
+      },
+      "mutate.knapsack.perf_first": {
+        "failures": 1.0,
+        "horizon_generations": 3,
+        "intent": "mutate",
+        "invalid_reasons": {
+          "PromptValidationError": 1
+        },
+        "invalid_responses": 1.0,
+        "island": "performance",
+        "name": "mutate.knapsack.perf_first",
+        "problem_id": "knapsack",
+        "recent_reward": 0.0,
+        "successes": 1.0,
+        "template_path": "agents/prompts/mutate.knapsack.perf_first.md"
+      },
+      "mutate.knapsack.robust_first": {
+        "failures": 1.0,
+        "horizon_generations": 3,
+        "intent": "mutate",
+        "invalid_reasons": {
+          "PromptValidationError": 1
+        },
+        "invalid_responses": 1.0,
+        "island": "robustness",
+        "name": "mutate.knapsack.robust_first",
+        "problem_id": "knapsack",
+        "recent_reward": 0.0,
+        "successes": 1.0,
+        "template_path": "agents/prompts/mutate.knapsack.robust_first.md"
+      },
+      "mutate.perf_first": {
+        "failures": 1.0,
+        "horizon_generations": 3,
+        "intent": "mutate",
+        "invalid_reasons": {},
+        "invalid_responses": 0.0,
+        "island": "performance",
+        "name": "mutate.perf_first",
+        "problem_id": "sample_problem",
+        "recent_reward": 0.0,
+        "successes": 1.0,
+        "template_path": "agents/prompts/mutate.perf_first.md"
+      },
+      "mutate.robust_first": {
+        "failures": 1.2368340568846503,
+        "horizon_generations": 3,
+        "intent": "mutate",
+        "invalid_reasons": {},
+        "invalid_responses": 0.0,
+        "island": "robustness",
+        "name": "mutate.robust_first",
+        "problem_id": "sample_problem",
+        "recent_reward": 0.7631659431153496,
+        "successes": 1.7631659431153497,
+        "template_path": "agents/prompts/mutate.robust_first.md"
+      },
+      "mutate.shortest_path.perf_first": {
+        "failures": 1.0,
+        "horizon_generations": 3,
+        "intent": "mutate",
+        "invalid_reasons": {
+          "PromptValidationError": 1
+        },
+        "invalid_responses": 1.0,
+        "island": "performance",
+        "name": "mutate.shortest_path.perf_first",
+        "problem_id": "shortest_path",
+        "recent_reward": 0.0,
+        "successes": 1.0,
+        "template_path": "agents/prompts/mutate.shortest_path.perf_first.md"
+      },
+      "mutate.shortest_path.robust_first": {
+        "failures": 1.0,
+        "horizon_generations": 3,
+        "intent": "mutate",
+        "invalid_reasons": {
+          "PromptValidationError": 1
+        },
+        "invalid_responses": 1.0,
+        "island": "robustness",
+        "name": "mutate.shortest_path.robust_first",
+        "problem_id": "shortest_path",
+        "recent_reward": 0.0,
+        "successes": 1.0,
+        "template_path": "agents/prompts/mutate.shortest_path.robust_first.md"
+      },
+      "repair.v1": {
+        "failures": 1.6768968415433747,
+        "horizon_generations": 3,
+        "intent": "repair",
+        "invalid_reasons": {},
+        "invalid_responses": 0.0,
+        "island": "repair",
+        "name": "repair.v1",
+        "problem_id": "*",
+        "recent_reward": 0.7681343479283762,
+        "successes": 3.245066273835378,
+        "template_path": "agents/prompts/repair.v1.md"
+      }
+    },
+    "linucb": {
+      "A_inv": {
+        "crossover.v1": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "mutate.knapsack.perf_first": [
+          [
+            0.6666666666666667,
+            -0.3333333333333333,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            -0.3333333333333333,
+            0.6666666666666667,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "mutate.knapsack.robust_first": [
+          [
+            0.6666666666666667,
+            -0.3333333333333333,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            -0.3333333333333333,
+            0.6666666666666667,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "mutate.perf_first": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "mutate.robust_first": [
+          [
+            0.6666666666666667,
+            -0.3333333333333333,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            -0.3333333333333333,
+            0.6666666666666667,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "mutate.shortest_path.perf_first": [
+          [
+            0.6666666666666667,
+            -0.3333333333333333,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            -0.3333333333333333,
+            0.6666666666666667,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "mutate.shortest_path.robust_first": [
+          [
+            0.6666666666666667,
+            -0.3333333333333333,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            -0.3333333333333333,
+            0.6666666666666667,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "repair.v1": [
+          [
+            0.7095113175744069,
+            -0.2904886824255932,
+            -0.2904886824255932,
+            -0.046564999577093855,
+            0.0,
+            -0.12935787869168638
+          ],
+          [
+            -0.2904886824255932,
+            0.7095113175744069,
+            -0.2904886824255932,
+            -0.046564999577093855,
+            0.0,
+            -0.12935787869168638
+          ],
+          [
+            -0.2904886824255932,
+            -0.2904886824255932,
+            0.7095113175744069,
+            -0.046564999577093855,
+            0.0,
+            -0.12935787869168638
+          ],
+          [
+            -0.046564999577093855,
+            -0.046564999577093855,
+            -0.046564999577093855,
+            0.9918217265786491,
+            0.0,
+            -0.0363985589726381
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            -0.12935787869168638,
+            -0.12935787869168638,
+            -0.12935787869168638,
+            -0.0363985589726381,
+            0.0,
+            0.5987714985055343
+          ]
+        ]
+      },
+      "alpha": 0.8198270802536581,
+      "b": {
+        "crossover.v1": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mutate.knapsack.perf_first": [
+          -0.2,
+          -0.2,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mutate.knapsack.robust_first": [
+          -0.2,
+          -0.2,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mutate.perf_first": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mutate.robust_first": [
+          0.7631659431153496,
+          0.7631659431153496,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mutate.shortest_path.perf_first": [
+          -0.2,
+          -0.2,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "mutate.shortest_path.robust_first": [
+          -0.2,
+          -0.2,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "repair.v1": [
+          6.910835517515,
+          6.910835517515,
+          6.910835517515,
+          1.1825209646728605,
+          0.0,
+          4.716806436309181
+        ]
+      }
+    },
+    "templates": {
+      "crossover.v1": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for crossover.v1"
+        ],
+        "generation": 0,
+        "history": [],
+        "instructions": [
+          "merge complementary strengths from parent patches",
+          "resolve conflicting edits conservatively",
+          "emit SEARCH/REPLACE payload anchored by shared context",
+          "respond with JSON containing \"version\": 1 and at least one SEARCH/REPLACE patch",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Do not output explanations, markdown, or extra keys"
+        ],
+        "name": "crossover.v1",
+        "temperature": 0.7,
+        "title": "# Crossover prompt"
+      },
+      "mutate.knapsack.perf_first": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for mutate.knapsack.perf_first",
+          "Address invalid output (PromptValidationError)"
+        ],
+        "generation": 0,
+        "history": [],
+        "instructions": [
+          "explore dense DP or bitset accelerations",
+          "ensure loops run forwards for cache friendliness",
+          "keep modifications within EVOLVE block only",
+          "respond with JSON containing \"version\": 1 and at least one SEARCH/REPLACE patch",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Do not output explanations, markdown, or extra keys"
+        ],
+        "name": "mutate.knapsack.perf_first",
+        "temperature": 0.7,
+        "title": "# Knapsack performance arm"
+      },
+      "mutate.knapsack.robust_first": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for mutate.knapsack.robust_first",
+          "Address invalid output (PromptValidationError)"
+        ],
+        "generation": 0,
+        "history": [],
+        "instructions": [
+          "filter invalid items and guard capacity edges",
+          "prefer DP variants with deterministic updates",
+          "emit SEARCH/REPLACE patches anchored on helper functions",
+          "respond with JSON containing \"version\": 1 and at least one SEARCH/REPLACE patch",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Do not output explanations, markdown, or extra keys"
+        ],
+        "name": "mutate.knapsack.robust_first",
+        "temperature": 0.7,
+        "title": "# Knapsack robustness arm"
+      },
+      "mutate.perf_first": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for mutate.perf_first"
+        ],
+        "generation": 0,
+        "history": [],
+        "instructions": [
+          "explore loop fusion or caching to reduce runtime",
+          "keep SEARCH/REPLACE patch minimal and reversible",
+          "maintain accuracy while optimising throughput",
+          "respond with JSON containing \"version\": 1 and at least one SEARCH/REPLACE patch",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Do not output explanations, markdown, or extra keys"
+        ],
+        "name": "mutate.perf_first",
+        "temperature": 0.7,
+        "title": "# Performance-first mutation"
+      },
+      "mutate.robust_first": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for mutate.robust_first",
+          "Investigate L2_fail"
+        ],
+        "generation": 1,
+        "history": [
+          0.7631659431153496
+        ],
+        "instructions": [
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "respond with JSON containing \"version\": 1 and SEARCH/REPLACE patches only",
+          "surface telemetry for error cases in checklist",
+          "Do not output explanations, markdown, or extra keys",
+          "prefer idempotent SEARCH/REPLACE patches with clear anchors",
+          "add validation and guard rails for malformed inputs",
+          "Report metrics for mutate.robust_first"
+        ],
+        "name": "mutate.robust_first",
+        "temperature": 0.6473668113769301,
+        "title": "# Robustness-first mutation"
+      },
+      "mutate.shortest_path.perf_first": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for mutate.shortest_path.perf_first",
+          "Address invalid output (PromptValidationError)"
+        ],
+        "generation": 0,
+        "history": [],
+        "instructions": [
+          "favour adjacency lists and priority queues",
+          "include telemetry on relaxation counts",
+          "keep replacements focused within EVOLVE block",
+          "respond with JSON containing \"version\": 1 and at least one SEARCH/REPLACE patch",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Do not output explanations, markdown, or extra keys"
+        ],
+        "name": "mutate.shortest_path.perf_first",
+        "temperature": 0.7,
+        "title": "# Shortest path performance arm"
+      },
+      "mutate.shortest_path.robust_first": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for mutate.shortest_path.robust_first",
+          "Address invalid output (PromptValidationError)"
+        ],
+        "generation": 0,
+        "history": [],
+        "instructions": [
+          "validate edges and unreachable targets explicitly",
+          "prefer guard clauses over silent failure",
+          "output SEARCH/REPLACE patches with stable anchors",
+          "respond with JSON containing \"version\": 1 and at least one SEARCH/REPLACE patch",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Do not output explanations, markdown, or extra keys"
+        ],
+        "name": "mutate.shortest_path.robust_first",
+        "temperature": 0.7,
+        "title": "# Shortest path robustness arm"
+      },
+      "repair.v1": {
+        "backend": "flash",
+        "checklist": [
+          "Report metrics for repair.v1",
+          "Investigate L2_fail"
+        ],
+        "generation": 9,
+        "history": [
+          0.767864311207555,
+          0.7636731189826446,
+          0.7680006813972161,
+          0.7687938993618387,
+          0.768373615995128,
+          0.7687014803007933,
+          0.768567770735238,
+          0.7687262916062105,
+          0.7681343479283762
+        ],
+        "instructions": [
+          "Ensure payload.replace reproduces the entire EVOLVE block (copy the context block and edit it in full)",
+          "Return JSON exactly matching the schema described above with diff_type=\"sr\"",
+          "respond with JSON containing \"version\": 1 and at least one SEARCH/REPLACE patch",
+          "Do not output explanations, markdown, or extra keys",
+          "analyse logs for failing tests or build errors",
+          "propose minimal SEARCH/REPLACE fixes",
+          "ensure fix keeps solve() signature stable"
+        ],
+        "name": "repair.v1",
+        "temperature": 0.21783289649699972,
+        "title": "# Repair prompt"
+      }
+    }
+  },
+  "saved_at": "2025-10-18T17:14:14.865114+00:00",
+  "selection": {
+    "population": [
+      "4ac3d5f257804e8e9ab2e1859d30b17e",
+      "63d353d069454db896f4f22241c7ece4",
+      "ed99bec6753b4e0781ca07a125af0e47",
+      "a52f49a4ae97476aae9d1e49cbfa5bf0",
+      "e883ab2ffe0044a79974d006f6da9660",
+      "99c62b5314664bb6bb9a95e4431f974a",
+      "4fdafcd6f65b40a59c1f212defbd48d6",
+      "272f5d26cd714583b9dfdef27637da7d",
+      "f83fb48542054f2abdd042901de2b140",
+      "ba04be54a29a4cdebda76b2e606edc05"
+    ]
+  },
+  "version": 1
+}

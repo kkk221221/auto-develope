@@ -1,0 +1,68 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AutoEvolve Dashboard</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 2rem; background: #0b1e2d; color: #f0f4f8; }
+      h1 { margin-bottom: 0.5rem; }
+      table.grid { border-collapse: collapse; margin-bottom: 2rem; width: 100%; }
+      table.grid td { border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; vertical-align: top; min-width: 10%; }
+      table.grid caption { caption-side: top; font-weight: 600; margin-bottom: 0.75rem; }
+      .candidate { font-size: 0.9rem; line-height: 1.4; }
+      .candidate strong { display: block; font-size: 1rem; color: #8ae9ff; }
+      .unknown { color: #ffbe76; }
+      .empty { color: rgba(255,255,255,0.35); text-align: center; }
+      .pareto-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+      .pareto-card { border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 0.75rem; background: rgba(255,255,255,0.03); }
+      footer { margin-top: 2rem; font-size: 0.8rem; color: rgba(255,255,255,0.6); }
+    </style>
+  </head>
+  <body>
+    <h1>AutoEvolve Observatory</h1>
+    <p>Rendered at <code>2025-10-18T17:14:05.559370+00:00</code></p>
+    <table class='grid'><caption>MAP-Elites Occupancy</caption><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td>
+<div class='candidate'>
+  <strong>4ac3d5f257</strong>
+  <div>Acc: 1.000</div>
+  <div>Runtime: 374.9 ms</div>
+  <div>Robust: 1.000</div>
+  <div>LOC: 35</div>
+</div>
+</td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr><tr><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td><td><div class='empty'>∅</div></td></tr></table>
+    
+<section>
+  <h2>Pareto Front</h2>
+  <ul class='pareto-list'>
+    
+<li class='pareto-card'>
+  <strong>e883ab2ffe</strong>
+  <div>Problem: sample_problem</div>
+  <div>Accuracy: 1.000</div>
+  <div>Runtime: 336.1 ms</div>
+  <div>Robustness: 1.000</div>
+</li>
+
+<li class='pareto-card'>
+  <strong>4fdafcd6f6</strong>
+  <div>Problem: sample_problem</div>
+  <div>Accuracy: 1.000</div>
+  <div>Runtime: 336.7 ms</div>
+  <div>Robustness: 1.000</div>
+</li>
+
+<li class='pareto-card'>
+  <strong>f83fb48542</strong>
+  <div>Problem: sample_problem</div>
+  <div>Accuracy: 1.000</div>
+  <div>Runtime: 336.5 ms</div>
+  <div>Robustness: 1.000</div>
+</li>
+
+  </ul>
+</section>
+
+    <footer>Updated automatically from <code>.artifacts/map_elites.json</code>.</footer>
+  </body>
+</html>
